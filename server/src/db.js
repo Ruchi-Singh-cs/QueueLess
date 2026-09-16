@@ -1,0 +1,29 @@
+import mongoose from 'mongoose';
+import dns from 'node:dns';
+import { mkdirSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
+/** Connect to MONGO_URI, or an embedded mongod persisting to server/data when unset. Returns a stop() for the embedded case. */
+export async function connectDb() {
+  let uri = process.env.MONGO_URI;
+  let mongo;
+  if (!uri) {
+    // ponytail: no MONGO_URI -> embedded mongod persisting to ./data; set MONGO_URI to use a real server
+    const { MongoMemoryServer } = await import('mongodb-memory-server');
+    const dbPath = fileURLToPath(new URL('../data', import.meta.url));
+    mkdirSync(dbPath, { recursive: true });
+    mongo = await MongoMemoryServer.create({ instance: { dbPath, storageEngine: 'wiredTiger' } });
+    uri = mongo.getUri();
+  }
+  try {
+    await mongoose.connect(uri);
+  } catch (err) {
+    // mongodb+srv needs an SRV lookup; some local DNS stubs (VPNs, ad-blockers, 127.0.0.1 proxies) refuse it.
+    // Retry once through public resolvers (override with DNS_SERVERS=8.8.8.8,1.1.1.1). Only Node's resolver is affected.
+    if (!/^mongodb\+srv:/.test(uri) || !/querySrv|ECONNREFUSED|ENOTFOUND/.test(err.message)) throw err;
+    dns.setServers((process.env.DNS_SERVERS || '8.8.8.8,1.1.1.1').split(',').map((s) => s.trim()).filter(Boolean));
+    console.warn(`SRV lookup failed via system DNS (${err.message}); retrying with ${dns.getServers().join(', ')}`);
+    await mongoose.connect(uri);
+  }
+  return async () => { await mongoose.disconnect(); await mongo?.stop(); };
+}
