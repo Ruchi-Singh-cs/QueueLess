@@ -6,7 +6,7 @@ import { api } from '../api.js'
 import { useAuth } from '../auth.jsx'
 import { readSavedLocation, haversineKm, DEFAULT_CENTER } from '../lib/geo.js'
 import { roleHome } from '../lib/format.js'
-import { Button, Badge, LiveDot, AnimatedNumber, stagger, fadeUp } from '../ui/index.jsx'
+import { Button, Badge, LiveDot, AnimatedNumber, Reveal, stagger, fadeUp } from '../ui/index.jsx'
 import { ShopCard } from '../components/Cards.jsx'
 import { GoogleMap } from '../components/Map.jsx'
 
@@ -162,8 +162,8 @@ export default function Landing() {
             <Headline text="Skip the wait." />
             <motion.p variants={fadeUp} className="hero-sub">Join the queue virtually. Know your turn. Arrive when it matters.</motion.p>
             <motion.div variants={fadeUp} className="hero-cta">
-              <Button variant="primary" size="lg" to={user ? roleHome(user.role) : '/nearby'} icon={MapPin}>Find a Queue</Button>
-              <Button variant="secondary" size="lg" href="#business">For Businesses</Button>
+              <Button variant="primary" size="lg" magnetic to={user ? roleHome(user.role) : '/nearby'} icon={MapPin}>Find a Queue</Button>
+              <Button variant="secondary" size="lg" magnetic href="#business">For Businesses</Button>
             </motion.div>
             <motion.ul variants={fadeUp} className="hero-proof">
               <li><Zap aria-hidden />Token in seconds</li>
@@ -182,11 +182,11 @@ export default function Landing() {
       {/* HOW IT WORKS */}
       <section className="section" id="how">
         <div className="container">
-          <div className="section-head">
+          <Reveal className="section-head">
             <span className="eyebrow">How QueueLess works</span>
             <h2>Join remotely. Track live. Arrive when it matters.</h2>
             <p>Five steps between you and never sitting in a waiting room again.</p>
-          </div>
+          </Reveal>
           <ol className="how">{STEPS.map((s, i) => <Step key={s.n} s={s} i={i} />)}</ol>
         </div>
       </section>
@@ -194,11 +194,11 @@ export default function Landing() {
       {/* NEARBY */}
       <section className="section section-alt" id="nearby">
         <div className="container">
-          <div className="section-head">
+          <Reveal className="section-head">
             <span className="eyebrow">Nearby</span>
             <h2>Find services near you.</h2>
             <p>Discover nearby clinics, salons, banks, government offices and more — with live queue status before you leave home.</p>
-          </div>
+          </Reveal>
           <NearbyPreview />
         </div>
       </section>
@@ -206,12 +206,12 @@ export default function Landing() {
       {/* FOR BUSINESSES */}
       <section className="section" id="business">
         <div className="container biz">
-          <div className="section-head">
+          <Reveal className="section-head">
             <span className="eyebrow">For businesses</span>
             <h2>A calmer front desk. Happier customers.</h2>
             <p>Run your queue from one screen. Customers join from their phones; you press <b>Next</b>.</p>
-            <div className="row gap-2 wrap mt-5"><Button variant="primary" size="lg" to="/register?role=staff">Register your business<ArrowRight aria-hidden /></Button><Button variant="ghost" size="lg" to="/login">Vendor login</Button></div>
-          </div>
+            <div className="row gap-2 wrap mt-5"><Button variant="primary" size="lg" magnetic to="/register?role=staff">Register your business<ArrowRight aria-hidden /></Button><Button variant="ghost" size="lg" to="/login">Vendor login</Button></div>
+          </Reveal>
           <motion.ul className="biz-grid" variants={stagger} initial="hidden" whileInView="show" viewport={{ once: true, margin: '-60px' }}>
             {[[Store, 'Shop profile & map pin', 'Show up on the map with hours, services and directions.'], [ListOrdered, 'One-tap queue control', 'Next, skip, complete, pause — built for a busy counter.'], [CalendarDays, 'Appointments', 'Bookings check in as priority tokens automatically.'], [BarChart3, 'Analytics', 'Served today, average wait, busiest hours.'], [ShieldCheck, 'Role-based access', 'Vendors manage only their own shop. Admins see everything.'], [Bell, 'Automatic notifications', 'Customers are told when to return — you never shout a number again.']].map(([Icon, t, d]) => (
               <motion.li key={t} variants={fadeUp} className="card card-hover"><span className="icon-box"><Icon aria-hidden /></span><h3 className="mt-3">{t}</h3><p className="muted small mt-2">{d}</p></motion.li>
@@ -225,7 +225,7 @@ export default function Landing() {
         <div className="container">
           <motion.div className="cta-band" initial={{ opacity: 0, y: 28, scale: 0.98 }} whileInView={{ opacity: 1, y: 0, scale: 1 }} viewport={{ once: true, margin: '-80px' }} transition={{ duration: 0.6, ease: [0.2, 0.8, 0.2, 1] }}>
             <div><h2>Your time is yours again.</h2><p>Find a queue near you and take a token in seconds.</p></div>
-            <Button variant="primary" size="lg" to={user ? roleHome(user.role) : '/register'}>{user ? 'Go to my dashboard' : 'Get Started'}<ArrowRight aria-hidden /></Button>
+            <Button variant="primary" size="lg" magnetic to={user ? roleHome(user.role) : '/register'}>{user ? 'Go to my dashboard' : 'Get Started'}<ArrowRight aria-hidden /></Button>
           </motion.div>
         </div>
       </section>

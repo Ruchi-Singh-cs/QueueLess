@@ -297,3 +297,64 @@ button.nav-link:hover { background: var(--surface-2); }
 .logo-ring { transform-origin: 11.5px 11px; transition: transform .5s cubic-bezier(.2,.8,.2,1); }
 .logo:hover .logo-mark { transform: translateY(-1px) scale(1.04); box-shadow: 0 6px 18px -4px rgba(47, 107, 255, .7); }
 .logo:hover .logo-ring { transform: rotate(-120deg); }
+
+/* ===================== Motion layer =====================
+   Everything here animates transform / opacity / filter only, so the compositor handles it and
+   layout is never touched. All of it is disabled by the prefers-reduced-motion rule in base.css. */
+
+/* The navbar tightens as you leave the top of the page. */
+.navbar { transition: border-color var(--t-base), background var(--t-base), box-shadow var(--t-base), backdrop-filter var(--t-base); }
+.navbar.scrolled { box-shadow: 0 1px 24px -12px rgba(15, 23, 42, .35); backdrop-filter: saturate(180%) blur(18px); -webkit-backdrop-filter: saturate(180%) blur(18px); }
+.navbar .logo, .navbar .nav-right { transition: transform var(--t-base) cubic-bezier(.16,1,.3,1); }
+.navbar.scrolled .logo { transform: scale(.96); }
+
+/* Nav items lift very slightly; the active underline is already a spring layoutId. */
+.nav-link { transition: color var(--t-fast), background var(--t-fast), transform var(--t-fast) cubic-bezier(.16,1,.3,1); }
+.nav-link:hover { transform: translateY(-1px); }
+
+/* Icons inside buttons lean in the direction the button is going. */
+.btn svg { transition: transform .25s cubic-bezier(.16,1,.3,1); }
+.btn:hover:not(:disabled) svg:last-child:not(:first-child) { transform: translateX(3px); }
+.btn-icon:hover:not(:disabled) svg { transform: scale(1.12); }
+/* A magnetic button already moves via transform, so its own hover lift would fight it. */
+.btn-magnetic { will-change: transform; }
+.btn-magnetic:hover:not(:disabled) { transform: none; }
+
+/* Cards rise and deepen together rather than just changing border colour. */
+.card-hover { transition: border-color .25s ease, box-shadow .35s cubic-bezier(.16,1,.3,1), transform .35s cubic-bezier(.16,1,.3,1); }
+.card-hover:hover { transform: translateY(-3px); box-shadow: var(--shadow-lg); }
+
+/* Any image inside a hoverable card slowly pushes in. The wrapper hides the overflow. */
+.img-zoom { overflow: hidden; }
+.img-zoom img, .img-zoom > .cover { transition: transform .7s cubic-bezier(.16,1,.3,1); will-change: transform; }
+.card-hover:hover .img-zoom img, .img-zoom:hover img { transform: scale(1.06); }
+
+/* Pointer light. Fixed, never hit-testable, moved only by transform. */
+.cursor-glow {
+  position: fixed; top: 0; left: 0; z-index: 9999; pointer-events: none;
+  width: 26px; height: 26px; margin: -13px 0 0 -13px; border-radius: 50%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--primary) 55%, transparent), transparent 70%);
+  mix-blend-mode: plus-lighter;
+}
+@media (pointer: coarse) { .cursor-glow { display: none; } }
+
+/* Mobile menu items arrive one after another. CSS delays rather than a variants tree: the drawer's
+   children are plain links, and this costs no extra components. */
+.drawer-stagger > * { animation: drawer-item .42s cubic-bezier(.16,1,.3,1) both; }
+.drawer-stagger > *:nth-child(1) { animation-delay: .04s } .drawer-stagger > *:nth-child(2) { animation-delay: .08s }
+.drawer-stagger > *:nth-child(3) { animation-delay: .12s } .drawer-stagger > *:nth-child(4) { animation-delay: .16s }
+.drawer-stagger > *:nth-child(5) { animation-delay: .2s }  .drawer-stagger > *:nth-child(6) { animation-delay: .24s }
+.drawer-stagger > *:nth-child(7) { animation-delay: .28s } .drawer-stagger > *:nth-child(n+8) { animation-delay: .32s }
+@keyframes drawer-item { from { opacity: 0; transform: translateX(14px); } to { opacity: 1; transform: none; } }
+
+/* Between the mobile breakpoint and a comfortable desktop the nav shows every link AND the full
+   right-hand cluster, which overflowed the viewport by a few pixels. Tighten the spacing there. */
+@media (min-width: 768px) and (max-width: 919px) {
+  .navbar .container { gap: var(--s-2); }
+  .nav-links { margin-left: var(--s-2); gap: 0; }
+  .nav-link { padding: 0 8px; white-space: nowrap; }
+  .nav-link .nav-ind { left: 8px; right: 8px; }
+}
+/* the search icon is the one thing in the bar that is reachable two other ways (⌘K and the menu),
+   so it is what gives way when the nav runs out of room */
+@media (max-width: 919px) { .hide-compact { display: none !important; } }

@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import { Menu, X, Sun, Moon, Bell, LogOut, User, Search, Home, MapPin, Ticket, CalendarDays, LayoutDashboard, ListOrdered, Store, Wrench, BarChart3, Settings, Users, Building2, PanelLeftClose, PanelLeftOpen, ChevronDown, Zap } from 'lucide-react'
 import { useAuth } from '../auth.jsx'
 import { useTheme } from '../lib/theme.jsx'
 import { useNotifications } from '../lib/notifications.jsx'
 import { roleHome } from '../lib/format.js'
 import { Logo, Button, Avatar, Dropdown, MenuItem, cx } from '../ui/index.jsx'
+import { useScrolled } from '../lib/motion.js'
 import { Drawer } from '../ui/Modal.jsx'
 import { SearchPalette, useSearchPalette } from './SearchPalette.jsx'
 
@@ -54,11 +55,9 @@ export function Navbar() {
   const [open, setOpen] = useState(false)
   const location = useLocation()
   const palette = useSearchPalette()
-  useEffect(() => {
-    const on = () => setScrolled(window.scrollY > 8)
-    on(); window.addEventListener('scroll', on, { passive: true })
-    return () => window.removeEventListener('scroll', on)
-  }, [])
+  // one read per frame instead of one per scroll event
+  const scrolledNow = useScrolled(8)
+  useEffect(() => setScrolled(scrolledNow), [scrolledNow])
   useEffect(() => setOpen(false), [location])
   const links = user?.role === 'user' ? USER_LINKS : PUBLIC_LINKS
   const isHashActive = (l) => l.hash ? false : undefined
@@ -76,7 +75,7 @@ export function Navbar() {
                 </NavLink>)}
           </nav>
           <div className="nav-right">
-            <Button variant="ghost" icon={Search} aria-label="Search (Ctrl+K)" data-tip="Search  ⌘K" onClick={palette.open} className="hide-mobile" />
+            <Button variant="ghost" icon={Search} aria-label="Search (Ctrl+K)" data-tip="Search  ⌘K" onClick={palette.open} className="hide-mobile hide-compact" />
             <ThemeToggle />
             {user ? (
               <>
@@ -98,6 +97,7 @@ export function Navbar() {
         </div>
       </header>
       <Drawer open={open} onClose={() => setOpen(false)} label="Menu">
+        <div className="drawer-stagger">
         <div className="between mb-3"><Logo /><Button variant="ghost" icon={X} aria-label="Close menu" onClick={() => setOpen(false)} /></div>
         {links.map((l) => l.hash
           ? <a key={l.to} href={l.to} className="nav-link" onClick={() => setOpen(false)}>{l.label}</a>
@@ -107,6 +107,7 @@ export function Navbar() {
         <button type="button" className="nav-link" onClick={() => { setOpen(false); palette.open() }}><Search aria-hidden style={{ width: 18 }} />Search</button>
         <div className="divider mt-2 mb-2" />
         {!user && <div className="stack gap-2"><Button variant="primary" to="/register" block>Get Started</Button><Button variant="secondary" to="/login" block>Login</Button></div>}
+        </div>
       </Drawer>
       <SearchPalette />
     </>
@@ -162,10 +163,29 @@ export function PublicLayout({ footer = true }) {
   return (
     <>
       <Navbar />
-      <main className="grow"><Outlet /></main>
+      <main className="grow"><RouteFade /></main>
       {footer && <Footer />}
       <BottomNav />
     </>
+  )
+}
+
+/**
+ * Cross-fades the routed page while the surrounding chrome stays mounted. Pages keep their own
+ * PageTransition for the vertical rise; this only handles opacity, so the two compose instead of
+ * fighting. mode="wait" means the outgoing page is gone before the next paints.
+ */
+function RouteFade() {
+  const { pathname } = useLocation()
+  const reduce = useReducedMotion()
+  if (reduce) return <Outlet />
+  return (
+    <AnimatePresence mode="wait" initial={false}>
+      <motion.div key={pathname} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+        transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}>
+        <Outlet />
+      </motion.div>
+    </AnimatePresence>
   )
 }
 
@@ -229,7 +249,7 @@ export function DashboardLayout({ nav, title }) {
             <Button variant="ghost" icon={LogOut} aria-label="Log out" data-tip="Log out" onClick={() => { logout(); navigate('/') }} />
           </div>
         </div>
-        <main className="dash-content"><Outlet /></main>
+        <main className="dash-content"><RouteFade /></main>
       </div>
     </div>
   )

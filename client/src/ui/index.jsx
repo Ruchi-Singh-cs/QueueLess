@@ -2,6 +2,7 @@
 import { forwardRef, useEffect, useId, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion, AnimatePresence, animate, useReducedMotion } from 'framer-motion'
+import { EASE, page as pageMotion, rise, group, card as cardVariant, inView as inViewport, useMagnetic } from '../lib/motion.js'
 import { Inbox, AlertTriangle, ChevronDown } from 'lucide-react'
 
 const cx = (...a) => a.filter(Boolean).join(' ')
@@ -9,19 +10,30 @@ export { cx }
 
 /* ---------- Button ---------- */
 export const Button = forwardRef(function Button(
-  { variant = 'secondary', size, block, icon: Icon, loading, children, className, to, href, ...props }, ref,
+  { variant = 'secondary', size, block, icon: Icon, loading, children, className, to, href, magnetic, ...props }, ref,
 ) {
-  const cls = cx('btn', `btn-${variant}`, size && `btn-${size}`, block && 'btn-block', !children && Icon && 'btn-icon', className)
+  const cls = cx('btn', `btn-${variant}`, size && `btn-${size}`, block && 'btn-block', !children && Icon && 'btn-icon', magnetic && 'btn-magnetic', className)
   const inner = (
     <>
       {loading ? <span className="spinner" aria-hidden /> : Icon ? <Icon aria-hidden /> : null}
       {children}
     </>
   )
-  if (to) return <Link ref={ref} to={to} className={cls} {...props}>{inner}</Link>
-  if (href) return <a ref={ref} href={href} className={cls} {...props}>{inner}</a>
-  return <button ref={ref} type="button" className={cls} disabled={loading || props.disabled} {...props}>{inner}</button>
+  // The hook has to run every render; its result is only bound when `magnetic` is set. It already
+  // no-ops for reduced motion and for touch, where there is no hover to follow.
+  const mag = useMagnetic()
+  const bind = magnetic
+    ? { ref: mergeRefs(ref, mag.ref), style: { ...mag.style, ...props.style } }
+    : { ref }
+  const { style: _s, ...rest } = props
+  const p = magnetic ? rest : props
+
+  if (to) return <MLink {...bind} to={to} className={cls} {...p}>{inner}</MLink>
+  if (href) return <motion.a {...bind} href={href} className={cls} {...p}>{inner}</motion.a>
+  return <motion.button {...bind} type="button" className={cls} disabled={loading || p.disabled} {...p}>{inner}</motion.button>
 })
+const MLink = motion.create ? motion.create(Link) : motion(Link)
+const mergeRefs = (...refs) => (node) => refs.forEach((r) => { if (typeof r === 'function') r(node); else if (r) r.current = node })
 
 /* ---------- Inputs ---------- */
 export function Field({ label, hint, error, children, className, htmlFor }) {
@@ -221,10 +233,34 @@ export { ChevronDown }
 export function PageTransition({ children, className, style }) {
   const reduce = useReducedMotion()
   return (
-    <motion.div className={className} style={style} initial={reduce ? false : { opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, ease: [0.2, 0.8, 0.2, 1] }}>
+    <motion.div className={className} style={style}
+      initial={reduce ? false : pageMotion.initial} animate={pageMotion.animate} exit={reduce ? undefined : pageMotion.exit}>
       {children}
     </motion.div>
   )
 }
+
+/**
+ * Reveals its children when they scroll into view. One place to change how the whole site enters,
+ * and it degrades to a plain wrapper under reduced motion rather than leaving content hidden.
+ */
+export function Reveal({ children, as = 'div', delay = 0, y = 18, className, style, stagger: st }) {
+  const reduce = useReducedMotion()
+  const M = motion[as] || motion.div
+  if (reduce) { const A = as; return <A className={className} style={style}>{children}</A> }
+  return (
+    <M className={className} style={style} initial="hidden" whileInView="show" viewport={inViewport}
+      variants={st ? group(st, delay) : { hidden: { opacity: 0, y }, show: { opacity: 1, y: 0, transition: { duration: 0.55, ease: EASE, delay } } }}>
+      {children}
+    </M>
+  )
+}
+/** A child of a <Reveal stagger> — it inherits the parent's timing. */
+export const RevealItem = ({ children, as = 'div', className, style, variants = cardVariant }) => {
+  const M = motion[as] || motion.div
+  return <M className={className} style={style} variants={variants}>{children}</M>
+}
+
+export { rise, group, cardVariant, useMagnetic }
 export const stagger = { hidden: {}, show: { transition: { staggerChildren: 0.05 } } }
 export const fadeUp = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0, transition: { duration: 0.35, ease: [0.2, 0.8, 0.2, 1] } } }

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { motion } from 'framer-motion'
 import { MapPin, Clock, Phone, Mail, Navigation, CalendarDays, Ticket, ArrowLeft, Users } from 'lucide-react'
 import { api, isActive } from '../api.js'
 import { useAuth } from '../auth.jsx'
@@ -35,7 +36,11 @@ export default function Shop() {
   return (
     <PageTransition className="shop">
       <div className={cx('shop-hero', shop?.image && imgOk && 'has-img')}>
-        {shop?.image && imgOk && <img src={shop.image} alt="" className="shop-hero-img" onError={() => setImgOk(false)} />}
+        {shop?.image && imgOk && (
+          <motion.img src={shop.image} alt="" className="shop-hero-img" onError={() => setImgOk(false)}
+            initial={{ scale: 1.08, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+            transition={{ duration: 1.1, ease: [0.16, 1, 0.3, 1] }} />
+        )}
         <div className="shop-hero-overlay" />
         <div className="container shop-hero-inner">
           <Button variant="ghost" size="sm" icon={ArrowLeft} onClick={() => (history.length > 1 ? navigate(-1) : navigate('/nearby'))} className="shop-back">Back</Button>
