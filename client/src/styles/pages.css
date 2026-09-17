@@ -267,6 +267,10 @@ button.service-card:hover { border-color: var(--text-3); }
 .loc-prompt .icon-box svg { width: 26px; height: 26px; }
 .loc-prompt h3 { font-size: 1.375rem; letter-spacing: -.02em; margin-bottom: var(--s-2); }
 .loc-prompt p { max-width: 380px; }
+/* the map picker needs the full width, unlike the centred permission card */
+.loc-prompt-wide { align-items: stretch; text-align: left; padding: var(--s-6); }
+.loc-prompt-wide p { max-width: none; }
+.warn-text { color: var(--warning); font-weight: 600; }
 
 /* ===================== Search palette ===================== */
 .palette { width: min(640px, 100%); background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); box-shadow: var(--shadow-lg); overflow: hidden; }
