@@ -2,7 +2,7 @@
 import { forwardRef, useEffect, useId, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion, AnimatePresence, animate, useReducedMotion } from 'framer-motion'
-import { Inbox, AlertTriangle, ChevronDown, Zap } from 'lucide-react'
+import { Inbox, AlertTriangle, ChevronDown } from 'lucide-react'
 
 const cx = (...a) => a.filter(Boolean).join(' ')
 export { cx }
@@ -89,9 +89,23 @@ export function Avatar({ name = '?', size, className }) {
   const initials = name.split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase()).join('')
   return <span className={cx('avatar', size && `avatar-${size}`, className)} aria-hidden>{initials}</span>
 }
+/**
+ * The mark: a progress ring stopped just short of closing — the moment before your turn — whose gap
+ * and tail read as a Q. The dot at the centre is your token. Drawn rather than borrowed from an icon
+ * set so it stays ours and stays legible at favicon size.
+ */
+export const LogoMark = ({ className }) => (
+  <svg viewBox="0 0 24 24" className={cx('logo-glyph', className)} fill="none" aria-hidden
+    stroke="currentColor" strokeWidth="3" strokeLinecap="round">
+    <path className="logo-ring" d="M13.89 17.58A7 7 0 1 1 18.08 13.39" />
+    <path d="M14.2 14.2 18.6 18.6" />
+    <circle cx="11.5" cy="11" r="2" fill="currentColor" stroke="none" />
+  </svg>
+)
+
 export const Logo = ({ to = '/', className }) => (
   <Link to={to} className={cx('logo', className)} aria-label="QueueLess home">
-    <span className="logo-mark"><Zap strokeWidth={2.5} /></span>
+    <span className="logo-mark"><LogoMark /></span>
     <span>QueueLess</span>
   </Link>
 )
