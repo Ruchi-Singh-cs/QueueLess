@@ -44,7 +44,7 @@ function Counter({ n, token, shop, busy, act, arrived, active, onFocus, tile }) 
 
       <div className="live-number gradient-text num" aria-live="polite">
         <AnimatePresence mode="popLayout" initial={false}>
-          <motion.span key={token?._id || 'none'} initial={{ opacity: 0, y: 28, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -28, scale: 0.9 }} transition={{ duration: 0.3, ease: [0.2, 0.8, 0.2, 1] }} style={{ display: 'inline-block' }}>
+          <motion.span key={token?._id || 'none'} initial={{ opacity: 0, y: 28, scale: 0.86 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -28, scale: 0.9 }} transition={{ type: 'spring', stiffness: 240, damping: 20 }} style={{ display: 'inline-block' }}>
             {token ? `#${token.number}` : '—'}
           </motion.span>
         </AnimatePresence>

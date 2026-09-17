@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { motion, useInView, useReducedMotion } from 'framer-motion'
+import { motion, useInView, useReducedMotion, useScroll, useTransform } from 'framer-motion'
 import { ArrowRight, MapPin, Bell, Users, Clock, Search, ListOrdered, Radar, Footprints, Store, BarChart3, ShieldCheck, Zap, CalendarDays } from 'lucide-react'
 import { api } from '../api.js'
 import { useAuth } from '../auth.jsx'
@@ -9,6 +9,48 @@ import { roleHome } from '../lib/format.js'
 import { Button, Badge, LiveDot, AnimatedNumber, stagger, fadeUp } from '../ui/index.jsx'
 import { ShopCard } from '../components/Cards.jsx'
 import { GoogleMap } from '../components/Map.jsx'
+
+/* Headline that assembles itself a word at a time. */
+function Headline({ text }) {
+  const reduce = useReducedMotion()
+  if (reduce) return <motion.h1 variants={fadeUp}>{text}</motion.h1>
+  return (
+    <motion.h1 variants={{ hidden: {}, show: { transition: { staggerChildren: 0.08, delayChildren: 0.1 } } }} style={{ perspective: 600 }}>
+      {text.split(' ').map((w, i) => (
+        <motion.span key={i} className="hero-word"
+          variants={{ hidden: { opacity: 0, y: '0.5em', rotateX: -40 }, show: { opacity: 1, y: 0, rotateX: 0, transition: { duration: 0.55, ease: [0.2, 0.8, 0.2, 1] } } }}>
+          {w}
+        </motion.span>
+      ))}
+    </motion.h1>
+  )
+}
+
+/* Real numbers, counted up as the strip scrolls in — nothing here is invented. */
+function LiveStrip() {
+  const [s, setS] = useState(null)
+  useEffect(() => {
+    api('/api/queues')
+      .then((d) => setS({
+        shops: d.queues.length,
+        waiting: d.queues.reduce((a, q) => a + (q.waitingCount || 0), 0),
+        services: d.queues.reduce((a, q) => a + (q.services?.length || 0), 0),
+      }))
+      .catch(() => setS(null))
+  }, [])
+  if (!s) return null
+  const items = [[s.shops, 'businesses listed'], [s.waiting, 'people in a queue right now'], [s.services, 'services you can book']]
+  return (
+    <motion.ul className="live-strip" initial="hidden" whileInView="show" viewport={{ once: true, margin: '-40px' }} variants={stagger}>
+      {items.map(([v, label]) => (
+        <motion.li key={label} variants={fadeUp}>
+          <span className="live-strip-num num gradient-text"><AnimatedNumber value={v} /></span>
+          <span className="xs muted">{label}</span>
+        </motion.li>
+      ))}
+    </motion.ul>
+  )
+}
 
 /* ---------- Hero product mockup: a live-feeling QueueLess screen ---------- */
 function ProductMock() {
@@ -99,15 +141,25 @@ function NearbyPreview() {
 
 export default function Landing() {
   const { user } = useAuth()
+  const reduce = useReducedMotion()
+  const heroRef = useRef(null)
+  const { scrollYProgress } = useScroll({ target: heroRef, offset: ['start start', 'end start'] })
+  // subtle depth: the mock lifts and tips away slightly faster than the copy
+  const mockY = useTransform(scrollYProgress, [0, 1], [0, -70])
+  const mockRotate = useTransform(scrollYProgress, [0, 1], [0, -4])
+  const copyY = useTransform(scrollYProgress, [0, 1], [0, 40])
+  const heroFade = useTransform(scrollYProgress, [0, 0.85], [1, 0])
+  const par = (v) => (reduce ? undefined : v)
   return (
     <>
       {/* HERO */}
-      <section className="hero">
+      <section className="hero" ref={heroRef}>
         <div className="hero-bg bg-grid" aria-hidden />
+        <div className="hero-glow" aria-hidden />
         <div className="container hero-grid">
-          <motion.div className="hero-copy" initial="hidden" animate="show" variants={stagger}>
+          <motion.div className="hero-copy" initial="hidden" animate="show" variants={stagger} style={{ y: par(copyY), opacity: par(heroFade) }}>
             <motion.div variants={fadeUp}><Badge tone="primary" size="lg"><LiveDot />Real-time virtual queues</Badge></motion.div>
-            <motion.h1 variants={fadeUp}>Skip the wait.</motion.h1>
+            <Headline text="Skip the wait." />
             <motion.p variants={fadeUp} className="hero-sub">Join the queue virtually. Know your turn. Arrive when it matters.</motion.p>
             <motion.div variants={fadeUp} className="hero-cta">
               <Button variant="primary" size="lg" to={user ? roleHome(user.role) : '/nearby'} icon={MapPin}>Find a Queue</Button>
@@ -119,10 +171,12 @@ export default function Landing() {
               <li><Bell aria-hidden />Notified when it's near</li>
             </motion.ul>
           </motion.div>
-          <motion.div className="hero-visual" initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.2, ease: [0.2, 0.8, 0.2, 1] }}>
+          <motion.div className="hero-visual" initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.2, ease: [0.2, 0.8, 0.2, 1] }}
+            style={{ y: par(mockY), rotate: par(mockRotate) }}>
             <ProductMock />
           </motion.div>
         </div>
+        <div className="container"><LiveStrip /></div>
       </section>
 
       {/* HOW IT WORKS */}
@@ -169,10 +223,10 @@ export default function Landing() {
       {/* CTA */}
       <section className="section">
         <div className="container">
-          <div className="cta-band">
+          <motion.div className="cta-band" initial={{ opacity: 0, y: 28, scale: 0.98 }} whileInView={{ opacity: 1, y: 0, scale: 1 }} viewport={{ once: true, margin: '-80px' }} transition={{ duration: 0.6, ease: [0.2, 0.8, 0.2, 1] }}>
             <div><h2>Your time is yours again.</h2><p>Find a queue near you and take a token in seconds.</p></div>
             <Button variant="primary" size="lg" to={user ? roleHome(user.role) : '/register'}>{user ? 'Go to my dashboard' : 'Get Started'}<ArrowRight aria-hidden /></Button>
-          </div>
+          </motion.div>
         </div>
       </section>
     </>

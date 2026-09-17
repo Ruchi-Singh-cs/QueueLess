@@ -112,7 +112,9 @@ export default function Ticket() {
           </motion.div>
         ) : (
           <motion.div key="live" className="ticket-grid" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-            <div className={cx('card ticket-main', serving && 'is-serving')}>
+            <motion.div className={cx('card ticket-main', serving && 'is-serving')}
+              animate={serving ? { scale: [1, 1.015, 1] } : undefined}
+              transition={{ duration: 0.5, ease: [0.2, 0.8, 0.2, 1] }}>
               {serving && (
                 <Alert tone="success" icon={Check} className="mb-4">
                   <b>It's your turn.</b>{' '}
@@ -123,7 +125,11 @@ export default function Ticket() {
               )}
               {near && !serving && <Alert tone="warning" icon={Bell} className="mb-4"><b>Get ready.</b> Only {ticket.ahead} {ticket.ahead === 1 ? 'person' : 'people'} ahead — head back now.</Alert>}
               <span className="eyebrow">Your token</span>
-              <span className="token-hero gradient-text num"><AnimatedNumber value={ticket.number} prefix="#" /></span>
+              <motion.span key={ticket.status} className="token-hero gradient-text num"
+                initial={{ scale: 0.94, opacity: 0.6 }} animate={{ scale: 1, opacity: 1 }}
+                transition={{ type: 'spring', stiffness: 260, damping: 18 }} style={{ display: 'inline-block' }}>
+                <AnimatedNumber value={ticket.number} prefix="#" />
+              </motion.span>
               <div className="ticket-stats">
                 <div><span className="stat-label">{serving && ticket.counter && ticket.queue.counters > 1 ? 'Your counter' : 'Currently serving'}</span><span className="stat-value">{serving && ticket.counter && ticket.queue.counters > 1 ? ticket.counter : ticket.currentNumber == null ? '–' : <AnimatedNumber value={ticket.currentNumber} prefix="#" />}</span></div>
                 <div><span className="stat-label"><Users aria-hidden />Ahead</span><span className="stat-value"><AnimatedNumber value={ticket.ahead} /></span></div>
@@ -137,7 +143,7 @@ export default function Ticket() {
                 {ticket.status === 'waiting' && <Button variant="danger" size="sm" icon={LogOut} onClick={() => setConfirm(true)}>Leave Queue</Button>}
               </div>
               {error && <Alert tone="error" className="mt-3">{error}</Alert>}
-            </div>
+            </motion.div>
             <aside className="card">
               <div className="between mb-4"><h3>Queue timeline</h3><span className="small muted">{ticket.waitingNumbers?.length ?? 0} waiting</span></div>
               <QueueTimeline currentNumber={ticket.currentNumber} waitingNumbers={ticket.waitingNumbers || []} mine={ticket.status === 'waiting' ? ticket.number : null} />

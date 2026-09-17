@@ -390,3 +390,41 @@ button.service-card:hover { border-color: var(--text-3); }
 .heat-legend { display: flex; align-items: center; gap: var(--s-2); margin-top: var(--s-3); }
 .heat-scale { flex: none; width: 72px; height: 8px; border-radius: var(--r-pill); background: linear-gradient(90deg, var(--surface-2), var(--primary)); }
 @media (max-width: 639px) { .heat-grid { grid-template-columns: 28px repeat(24, minmax(0, 1fr)); gap: 2px; } .heat-cell { min-height: 8px; } }
+
+/* ===================== Landing motion ===================== */
+/* each word animates as its own block, so the gap has to come from CSS */
+.hero-word { display: inline-block; transform-origin: 50% 100%; }
+.hero-word + .hero-word { margin-left: .25em; }
+
+/* a slow drift behind the hero — large, low-contrast, never competing with the copy */
+.hero-glow { position: absolute; inset: -20% -10% auto -10%; height: 130%; z-index: 0; pointer-events: none; filter: blur(60px); opacity: .55; }
+.hero-glow::before, .hero-glow::after { content: ''; position: absolute; border-radius: 50%; }
+.hero-glow::before { width: 46vw; height: 46vw; left: 8%; top: 4%; background: radial-gradient(circle, rgba(47, 107, 255, .32), transparent 70%); animation: drift-a 22s ease-in-out infinite; }
+.hero-glow::after { width: 38vw; height: 38vw; right: 6%; top: 18%; background: radial-gradient(circle, rgba(109, 92, 255, .26), transparent 70%); animation: drift-b 28s ease-in-out infinite; }
+@keyframes drift-a { 0%, 100% { transform: translate3d(0, 0, 0) scale(1); } 50% { transform: translate3d(6%, 8%, 0) scale(1.12); } }
+@keyframes drift-b { 0%, 100% { transform: translate3d(0, 0, 0) scale(1); } 50% { transform: translate3d(-7%, 6%, 0) scale(1.08); } }
+
+/* live counts under the hero */
+.live-strip { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: var(--s-6); list-style: none; padding: var(--s-6) 0 0; margin: var(--s-7) 0 0; border-top: 1px solid var(--border); }
+.live-strip li { display: flex; flex-direction: column; gap: 2px; }
+.live-strip-num { font-size: clamp(1.5rem, 3.5vw, 2.25rem); font-weight: 800; letter-spacing: -.03em; line-height: 1; }
+@media (max-width: 639px) { .live-strip { gap: var(--s-5); } }
+
+/* ===================== Live feel ===================== */
+/* "it's your turn" earns a soft breathing ring — it is the one moment that matters */
+.ticket-main.is-serving { animation: turn-glow 2.4s ease-in-out infinite; }
+@keyframes turn-glow {
+  0%, 100% { box-shadow: 0 0 0 1px var(--success), 0 0 0 0 color-mix(in srgb, var(--success) 40%, transparent); }
+  50%      { box-shadow: 0 0 0 1px var(--success), 0 0 0 10px color-mix(in srgb, var(--success) 0%, transparent); }
+}
+/* the counter a shop is about to act on */
+.live-now.active .live-number { animation: num-breathe 3s ease-in-out infinite; }
+@keyframes num-breathe { 0%, 100% { opacity: 1; } 50% { opacity: .86; } }
+
+/* ===================== Micro-interactions ===================== */
+.btn { transition: background .15s ease, border-color .15s ease, color .15s ease, box-shadow .2s ease, transform .12s cubic-bezier(.2,.8,.2,1); }
+.btn-primary:hover:not(:disabled) { transform: translateY(-1px); }
+.btn:active:not(:disabled) { transform: scale(.97); }
+.card { transition: border-color .2s ease, box-shadow .25s ease, transform .25s cubic-bezier(.2,.8,.2,1); }
+.wait-row { transition: border-color .2s ease, background .2s ease, transform .2s cubic-bezier(.2,.8,.2,1); }
+.wait-row:hover { transform: translateX(2px); }
