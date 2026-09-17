@@ -5,6 +5,7 @@ import { ArrowRight, MapPin, Bell, Users, Clock, Search, ListOrdered, Radar, Foo
 import { api } from '../api.js'
 import { useAuth } from '../auth.jsx'
 import { readSavedLocation, haversineKm, DEFAULT_CENTER } from '../lib/geo.js'
+import { withGsap } from '../lib/gsap.js'
 import { roleHome } from '../lib/format.js'
 import { Button, Badge, LiveDot, AnimatedNumber, Reveal, stagger, fadeUp } from '../ui/index.jsx'
 import { ShopCard } from '../components/Cards.jsx'
@@ -104,7 +105,8 @@ function Step({ s, i }) {
     <motion.li ref={ref} className="how-step" initial={{ opacity: 0, y: 20 }} animate={inView ? { opacity: 1, y: 0 } : undefined} transition={{ duration: 0.45, delay: 0.05, ease: [0.2, 0.8, 0.2, 1] }}>
       <div className="how-rail">
         <span className="how-num">{s.n}</span>
-        {i < STEPS.length - 1 && <motion.span className="how-line" initial={{ scaleY: 0 }} animate={inView ? { scaleY: 1 } : undefined} transition={{ duration: 0.6, delay: 0.3 }} />}
+        {/* scaleY is driven by GSAP ScrollTrigger below, not by Framer, so the two never fight */}
+        {i < STEPS.length - 1 && <span className="how-line" />}
       </div>
       <div className="how-body">
         <span className="icon-box"><s.icon aria-hidden /></span>
@@ -112,6 +114,22 @@ function Step({ s, i }) {
       </div>
     </motion.li>
   )
+}
+
+/**
+ * Welds the timeline rail to the scroll wheel: each connector fills exactly as far as you have
+ * scrolled past its step, and unfills if you scroll back. That two-way tie to scroll position is
+ * what GSAP's scrub gives us and Framer's viewport triggers cannot.
+ */
+function useScrollRail(ref) {
+  useEffect(() => withGsap(({ gsap }) => {
+    gsap.utils.toArray('.how-line').forEach((line) => {
+      gsap.fromTo(line, { scaleY: 0 }, {
+        scaleY: 1, ease: 'none',
+        scrollTrigger: { trigger: line, start: 'top 85%', end: 'bottom 55%', scrub: 0.4 },
+      })
+    })
+  }, ref.current), [ref])
 }
 
 /* ---------- Nearby preview ---------- */
@@ -142,6 +160,8 @@ function NearbyPreview() {
 export default function Landing() {
   const { user } = useAuth()
   const reduce = useReducedMotion()
+  const howRef = useRef(null)
+  useScrollRail(howRef)
   const heroRef = useRef(null)
   const { scrollYProgress } = useScroll({ target: heroRef, offset: ['start start', 'end start'] })
   // subtle depth: the mock lifts and tips away slightly faster than the copy
@@ -187,7 +207,7 @@ export default function Landing() {
             <h2>Join remotely. Track live. Arrive when it matters.</h2>
             <p>Five steps between you and never sitting in a waiting room again.</p>
           </Reveal>
-          <ol className="how">{STEPS.map((s, i) => <Step key={s.n} s={s} i={i} />)}</ol>
+          <ol className="how" ref={howRef}>{STEPS.map((s, i) => <Step key={s.n} s={s} i={i} />)}</ol>
         </div>
       </section>
 
