@@ -19,7 +19,7 @@ function Headline({ text }) {
       {text.split(' ').map((w, i) => (
         <motion.span key={i} className="hero-word"
           variants={{ hidden: { opacity: 0, y: '0.5em', rotateX: -40 }, show: { opacity: 1, y: 0, rotateX: 0, transition: { duration: 0.55, ease: [0.2, 0.8, 0.2, 1] } } }}>
-          {w}
+          {i ? ' ' + w : w}
         </motion.span>
       ))}
     </motion.h1>

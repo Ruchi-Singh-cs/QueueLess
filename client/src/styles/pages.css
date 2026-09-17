@@ -392,9 +392,9 @@ button.service-card:hover { border-color: var(--text-3); }
 @media (max-width: 639px) { .heat-grid { grid-template-columns: 28px repeat(24, minmax(0, 1fr)); gap: 2px; } .heat-cell { min-height: 8px; } }
 
 /* ===================== Landing motion ===================== */
-/* each word animates as its own block, so the gap has to come from CSS */
-.hero-word { display: inline-block; transform-origin: 50% 100%; }
-.hero-word + .hero-word { margin-left: .25em; }
+/* each word animates as its own block; the space is a real non-breaking character inside the span,
+   so the heading still reads and copies as "Skip the wait." */
+.hero-word { display: inline-block; transform-origin: 50% 100%; white-space: pre; }
 
 /* a slow drift behind the hero — large, low-contrast, never competing with the copy */
 .hero-glow { position: absolute; inset: -20% -10% auto -10%; height: 130%; z-index: 0; pointer-events: none; filter: blur(60px); opacity: .55; }

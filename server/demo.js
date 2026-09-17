@@ -3,7 +3,7 @@
 // customer waiting to be recalled, a month of history for the charts, and a shop awaiting approval.
 // Run: npm run demo          (same MONGO_URI / embedded db as the server; re-run any time to reset the stage)
 import bcrypt from 'bcryptjs';
-import { User, Queue, Token } from './src/models.js';
+import { User, Queue, Token, Appointment } from './src/models.js';
 import { seed } from './seed.js';
 
 const STAGE = 'Dr. Sharma Clinic'; // the shop the walkthrough uses
@@ -92,6 +92,22 @@ export async function demo() {
   shop.counterDate = new Date().toISOString().slice(0, 10);
   await shop.save();
 
+  // ---- appointments, always in the future ----
+  // seed() creates these once and skips them forever after, so by the next run they have gone stale
+  // and two customer screens sit empty. Re-cut them from now on every staging.
+  await Appointment.deleteMany({ user: customer._id, status: 'booked' });
+  // one soon enough to sit under Today, the rest at hours a real shop is actually open
+  const soon = new Date(now + 2 * 3600e3); soon.setMinutes(30, 0, 0);
+  const dayAt = (days, hour, min = 0) => { const d = new Date(now + days * 864e5); d.setHours(hour, min, 0, 0); return d; };
+  for (const [name, when, service, note] of [
+    [STAGE, soon, 'Follow-up', 'Review blood test results'],
+    ['Glow Salon', dayAt(1, 10, 30), 'Haircut', ''],
+    ['Smile Dental Care', dayAt(2, 16), 'Check-up', 'Sensitivity on the left side'],
+  ]) {
+    const q = await Queue.findOne({ name });
+    if (q) await Appointment.create({ queue: q._id, user: customer._id, at: when, service, note });
+  }
+
   // ---- a business waiting on the administrator ----
   const owner = await user('Nova Studio Owner', 'newshop@example.com', 'staff');
   const center = (await Queue.findOne({ name: STAGE }))?.location?.coordinates || [80.3319, 26.4499];
@@ -110,6 +126,7 @@ export async function demo() {
   );
 
   return {
+    appointments: await Appointment.countDocuments({ user: customer._id, status: 'booked' }),
     shops: base.total,
     stage: STAGE,
     history: made,
@@ -127,6 +144,7 @@ if (process.argv[1] && import.meta.url.endsWith(process.argv[1].replace(/\\/g, '
   QueueLess demo is staged.
 
     ${d.shops} shops · ${d.history} tokens of history at ${d.stage} · ${d.waiting} people waiting right now
+    ${d.appointments} upcoming appointments for the demo customer
     "${d.pending}" is sitting in the admin queue awaiting approval
 
   Log in with the password "${PASSWORD}":
