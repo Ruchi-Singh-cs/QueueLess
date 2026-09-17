@@ -9,7 +9,14 @@ export async function connectDb() {
   let mongo;
   if (!uri) {
     // ponytail: no MONGO_URI -> embedded mongod persisting to ./data; set MONGO_URI to use a real server
-    const { MongoMemoryServer } = await import('mongodb-memory-server');
+    // It is a devDependency, so a production install (Docker) does not have it. Say so plainly rather
+    // than dying with ERR_MODULE_NOT_FOUND.
+    let MongoMemoryServer;
+    try {
+      ({ MongoMemoryServer } = await import('mongodb-memory-server'));
+    } catch {
+      throw new Error('MONGO_URI is not set and the embedded database is unavailable in a production install. Set MONGO_URI to a MongoDB connection string (docker compose does this for you).');
+    }
     const dbPath = fileURLToPath(new URL('../data', import.meta.url));
     mkdirSync(dbPath, { recursive: true });
     mongo = await MongoMemoryServer.create({ instance: { dbPath, storageEngine: 'wiredTiger' } });
