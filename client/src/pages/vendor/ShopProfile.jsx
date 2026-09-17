@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
-import { Save, Building2, MapPin, Clock, Image as ImageIcon } from 'lucide-react'
+import { Save, Building2, MapPin, Clock, Image as ImageIcon, QrCode as QrCodeIcon } from 'lucide-react'
 import { api } from '../../api.js'
 import { useVendor } from './VendorContext.jsx'
 import { CATEGORIES } from '../../lib/format.js'
 import { Button, Field, Input, Select, Textarea, Alert, PageTransition, cx } from '../../ui/index.jsx'
+import { QrPoster } from '../../components/QrCode.jsx'
 import { useToast } from '../../ui/Toast.jsx'
 
 const Section = ({ icon: Icon, title, desc, children }) => (
@@ -66,6 +67,11 @@ export default function ShopProfile() {
             <Field label="Opening" htmlFor="sp-open"><Input id="sp-open" type="time" value={f.hours.open} onChange={setH('open')} /></Field>
             <Field label="Closing" htmlFor="sp-close"><Input id="sp-close" type="time" value={f.hours.close} onChange={setH('close')} /></Field>
           </div>
+        </Section>
+        <Section icon={QrCodeIcon} title="Counter QR" desc="Print it and tape it up. One scan opens your queue.">
+          <QrPoster value={`${window.location.origin}/shop/${shopId}`} filename={`queueless-${(f.name || 'shop').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}-qr.png`}>
+            <p className="small muted">Customers scan this to open your page and take a token without standing in line. It keeps working after you rename the shop.</p>
+          </QrPoster>
         </Section>
         <div className={cx('row gap-2')}><Button type="submit" variant="primary" icon={Save} loading={busy}>Save changes</Button></div>
       </form>

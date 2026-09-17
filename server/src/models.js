@@ -4,6 +4,7 @@ const { Schema } = mongoose;
 const ref = (model) => ({ type: Schema.Types.ObjectId, ref: model, required: true });
 
 export const CATEGORIES = ['medical', 'salon', 'bank', 'government', 'repair', 'other'];
+export const SHOP_STATUS = ['pending', 'approved', 'suspended'];
 
 export const User = mongoose.model('User', new Schema({
   name: { type: String, required: true, trim: true },
@@ -12,7 +13,7 @@ export const User = mongoose.model('User', new Schema({
   role: { type: String, enum: ['user', 'staff', 'admin'], default: 'user' },
 }, { timestamps: true }));
 
-// A Queue is a business ("shop") with one live queue. Shop profile fields live here too.
+// A Queue is a business ("shop") with one live queue served by one or more counters. Shop profile fields live here too.
 const queueSchema = new Schema({
   name: { type: String, required: true, trim: true },
   description: { type: String, default: '' },
@@ -21,7 +22,10 @@ const queueSchema = new Schema({
   isOpen: { type: Boolean, default: true },
   counter: { type: Number, default: 0 },
   counterDate: String,
-  currentToken: { type: Schema.Types.ObjectId, ref: 'Token', default: null },
+  currentToken: { type: Schema.Types.ObjectId, ref: 'Token', default: null }, // most recently called token
+  counters: { type: Number, default: 1, min: 1, max: 20 }, // how many customers can be served at once
+  graceMinutes: { type: Number, default: 0, min: 0, max: 60 }, // 0 = off; else a called customer who hasn't arrived is auto-skipped after this
+  status: { type: String, enum: SHOP_STATUS, default: () => (process.env.AUTO_APPROVE_SHOPS === '1' ? 'approved' : 'pending') },
   category: { type: String, enum: CATEGORIES, default: 'other' },
   phone: { type: String, default: '' },
   email: { type: String, default: '' },
@@ -34,7 +38,7 @@ const queueSchema = new Schema({
     type: { type: String, enum: ['Point'] },
     coordinates: { type: [Number], default: undefined },
   },
-});
+}, { timestamps: true });
 queueSchema.index({ location: '2dsphere' });
 export const Queue = mongoose.model('Queue', queueSchema);
 
@@ -45,8 +49,11 @@ const tokenSchema = new Schema({
   priority: { type: Boolean, default: false },
   service: { type: String, default: '' },
   status: { type: String, enum: ['waiting', 'serving', 'served', 'skipped', 'left'], default: 'waiting' },
+  counter: Number, // which counter called it (1..counters)
   calledAt: Date,
+  arrivedAt: Date, // staff confirmed the customer showed up (stops the grace timer)
   doneAt: Date,
+  pushed: { type: [String], default: [] }, // push notification kinds already sent for this token
 }, { timestamps: true });
 tokenSchema.index({ queue: 1, status: 1 });
 tokenSchema.index({ queue: 1, user: 1 }, { unique: true, partialFilterExpression: { status: { $in: ['waiting', 'serving'] } } });
@@ -63,3 +70,11 @@ const appointmentSchema = new Schema({
 }, { timestamps: true });
 appointmentSchema.index({ queue: 1, at: 1 }, { unique: true, partialFilterExpression: { status: 'booked' } });
 export const Appointment = mongoose.model('Appointment', appointmentSchema);
+
+// Web Push subscriptions (one user may have several devices)
+export const PushSubscription = mongoose.model('PushSubscription', new Schema({
+  user: ref('User'),
+  endpoint: { type: String, required: true, unique: true },
+  keys: { p256dh: { type: String, required: true }, auth: { type: String, required: true } },
+  userAgent: { type: String, default: '' },
+}, { timestamps: true }));

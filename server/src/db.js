@@ -15,15 +15,19 @@ export async function connectDb() {
     mongo = await MongoMemoryServer.create({ instance: { dbPath, storageEngine: 'wiredTiger' } });
     uri = mongo.getUri();
   }
+  // The embedded mongod is killed when a short script exits, and WiredTiger only checkpoints
+  // periodically — so the last writes of `npm run seed`/`npm run demo` were being lost. Journaling
+  // every write makes them survive the kill (and replay from ./data on the next start).
+  const opts = mongo ? { writeConcern: { w: 1, j: true } } : {};
   try {
-    await mongoose.connect(uri);
+    await mongoose.connect(uri, opts);
   } catch (err) {
     // mongodb+srv needs an SRV lookup; some local DNS stubs (VPNs, ad-blockers, 127.0.0.1 proxies) refuse it.
     // Retry once through public resolvers (override with DNS_SERVERS=8.8.8.8,1.1.1.1). Only Node's resolver is affected.
     if (!/^mongodb\+srv:/.test(uri) || !/querySrv|ECONNREFUSED|ENOTFOUND/.test(err.message)) throw err;
     dns.setServers((process.env.DNS_SERVERS || '8.8.8.8,1.1.1.1').split(',').map((s) => s.trim()).filter(Boolean));
     console.warn(`SRV lookup failed via system DNS (${err.message}); retrying with ${dns.getServers().join(', ')}`);
-    await mongoose.connect(uri);
+    await mongoose.connect(uri, opts);
   }
   return async () => { await mongoose.disconnect(); await mongo?.stop(); };
 }

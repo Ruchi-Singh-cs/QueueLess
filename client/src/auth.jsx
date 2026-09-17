@@ -1,6 +1,7 @@
 import { createContext, useContext, useState } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
 import { readAuth, writeAuth, resetSocket } from './api.js'
+import { unsubscribePush } from './lib/push.js'
 import { roleHome } from './lib/format.js'
 
 const AuthContext = createContext(null)
@@ -15,6 +16,9 @@ export function AuthProvider({ children }) {
   }
 
   function logout() {
+    // hand it the token before we drop it — the server only lets a device's own owner unsubscribe it.
+    // Deliberately not awaited: logging out must feel instant, and callers navigate away right after.
+    unsubscribePush(auth.token).catch(() => {})
     writeAuth(null)
     resetSocket()
     setAuth({ token: null, user: null })

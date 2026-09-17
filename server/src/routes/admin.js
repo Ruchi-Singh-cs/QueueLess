@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { User, Queue, Token, Appointment } from '../models.js';
+import { User, Queue, Token, Appointment, SHOP_STATUS } from '../models.js';
 import { authRequired, requireRole, fail } from '../auth.js';
 import { startOfToday } from '../queue.js';
 
@@ -28,7 +28,7 @@ r.get('/stats', async (req, res) => {
   const [users, businesses, activeQueues, todaysTokens, todaysAppointments, tokensPerDay, usersPerDay, appointmentsPerDay, recent] = await Promise.all([
     User.countDocuments(),
     Queue.countDocuments(),
-    Queue.countDocuments({ isOpen: true }),
+    Queue.countDocuments({ isOpen: true, status: { $ne: 'suspended' } }),
     Token.countDocuments({ createdAt: { $gte: since } }),
     Appointment.countDocuments({ at: { $gte: since, $lt: new Date(since.getTime() + DAY) }, status: { $ne: 'cancelled' } }),
     perDay(Token, 7),
@@ -39,11 +39,12 @@ r.get('/stats', async (req, res) => {
   const busiest = await Queue.find().populate('currentToken', 'number').limit(50);
   const waiting = await Token.aggregate([{ $match: { status: 'waiting' } }, { $group: { _id: '$queue', count: { $sum: 1 } } }]);
   const waitingBy = Object.fromEntries(waiting.map((w) => [String(w._id), w.count]));
+  const pendingShops = await Queue.countDocuments({ status: 'pending' });
   res.json({
-    users, businesses, activeQueues, todaysTokens, todaysAppointments,
+    users, businesses, activeQueues, todaysTokens, todaysAppointments, pendingShops,
     tokensPerDay, usersPerDay, appointmentsPerDay,
     recent: recent.map((t) => ({ _id: t._id, number: t.number, status: t.status, at: t.updatedAt, queue: t.queue, user: t.user })),
-    shops: busiest.map((q) => ({ _id: q._id, name: q.name, category: q.category, isOpen: q.isOpen, currentNumber: q.currentToken?.number ?? null, waitingCount: waitingBy[String(q._id)] || 0 }))
+    shops: busiest.map((q) => ({ _id: q._id, name: q.name, category: q.category, status: q.status || 'approved', isOpen: q.isOpen, currentNumber: q.currentToken?.number ?? null, waitingCount: waitingBy[String(q._id)] || 0 }))
       .sort((a, b) => b.waitingCount - a.waitingCount),
   });
 });
@@ -60,6 +61,15 @@ r.patch('/users/:id', async (req, res) => {
   const user = await User.findByIdAndUpdate(req.params.id, { role }, { new: true });
   if (!user) throw fail(404, 'user not found');
   res.json({ user: pub(user) });
+});
+
+// Business verification: pending → approved / suspended
+r.patch('/shops/:id', async (req, res) => {
+  const { status } = req.body ?? {};
+  if (!SHOP_STATUS.includes(status)) throw fail(400, 'invalid status');
+  const queue = await Queue.findByIdAndUpdate(req.params.id, { status }, { new: true });
+  if (!queue) throw fail(404, 'shop not found');
+  res.json({ shop: { _id: queue._id, name: queue.name, status: queue.status } });
 });
 
 export default r;

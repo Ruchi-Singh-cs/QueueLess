@@ -24,7 +24,7 @@ export default function Dashboard() {
       <div className="page-head" style={{ marginBottom: 0 }}><div><h1>Dashboard</h1><p className="sub">Platform overview · live.</p></div></div>
       <motion.div className="grid grid-4" variants={stagger} initial="hidden" animate="show">
         <motion.div variants={fadeUp}><StatCard label="Users" value={data.users} icon={Users} sub={`+${data.usersPerDay.at(-1)?.count ?? 0} today`} /></motion.div>
-        <motion.div variants={fadeUp}><StatCard label="Businesses" value={data.businesses} icon={Store} sub={`${data.activeQueues} accepting customers`} /></motion.div>
+        <motion.div variants={fadeUp}><StatCard label="Businesses" value={data.businesses} icon={Store} sub={data.pendingShops ? `${data.pendingShops} awaiting approval` : `${data.activeQueues} accepting customers`} /></motion.div>
         <motion.div variants={fadeUp}><StatCard label="Active queues" value={data.activeQueues} icon={ListOrdered} sub={`${data.shops.reduce((a, s) => a + s.waitingCount, 0)} people waiting`} accent /></motion.div>
         <motion.div variants={fadeUp}><StatCard label="Today's tokens" value={data.todaysTokens} icon={Ticket} sub={`${data.todaysAppointments} appointments today`} /></motion.div>
       </motion.div>

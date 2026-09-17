@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react'
+import { Fragment, useEffect, useId, useRef, useState } from 'react'
 import { cx } from '../ui/index.jsx'
 
 /**
@@ -49,4 +49,41 @@ export function Sparkline({ values, width = 96, height = 28 }) {
   const max = Math.max(1, ...values), min = Math.min(...values)
   const pts = values.map((v, i) => `${(i / Math.max(1, values.length - 1)) * width},${height - 2 - ((v - min) / (max - min || 1)) * (height - 4)}`).join(' ')
   return <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} aria-hidden className="spark"><polyline points={pts} fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" /></svg>
+}
+
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+/**
+ * Weekday × hour intensity grid — "when is this shop actually busy".
+ * `data` is number[7][24] with Sunday first, exactly as /stats returns it.
+ */
+export function HeatMap({ data, ariaLabel, format = (v) => `${v} token${v === 1 ? '' : 's'}` }) {
+  const max = Math.max(1, ...data.flat())
+  const hours = Array.from({ length: 24 }, (_, h) => h)
+  return (
+    <figure className="heat" aria-label={ariaLabel}>
+      <div className="heat-grid">
+        <span aria-hidden />
+        {hours.map((h) => <span key={h} className="heat-hour" aria-hidden>{h % 6 === 0 ? h : ''}</span>)}
+        {data.map((row, d) => (
+          <Fragment key={d}>
+            <span className="heat-day" aria-hidden>{WEEKDAYS[d]}</span>
+            {row.map((v, h) => (
+              <span key={h} className="heat-cell" style={{ '--v': v / max }}
+                title={`${WEEKDAYS[d]} ${String(h).padStart(2, '0')}:00 UTC — ${format(v)}`} />
+            ))}
+          </Fragment>
+        ))}
+      </div>
+      <figcaption className="heat-legend">
+        <span className="xs faint">Quiet</span>
+        <span className="heat-scale" aria-hidden />
+        <span className="xs faint">Busy · hours are UTC</span>
+      </figcaption>
+      <table className="sr-only">
+        <caption>{ariaLabel}</caption>
+        <tbody>{data.map((row, d) => <tr key={d}><th scope="row">{WEEKDAYS[d]}</th><td>{format(row.reduce((a, b) => a + b, 0))}</td></tr>)}</tbody>
+      </table>
+    </figure>
+  )
 }

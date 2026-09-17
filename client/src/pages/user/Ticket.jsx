@@ -4,12 +4,24 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Users, Clock, MapPin, Navigation, Bell, LogOut, Check, Ticket as TicketIcon, PartyPopper } from 'lucide-react'
 import { api } from '../../api.js'
 import { useFetch, useTicketUpdates, useQueueWatch } from '../../lib/hooks.js'
+import { pushState, subscribePush } from '../../lib/push.js'
+import { useNotifications } from '../../lib/notifications.jsx'
 import { directionsUrl } from '../../lib/geo.js'
 import { fmtMin, category } from '../../lib/format.js'
 import { Button, Badge, LiveDot, AnimatedNumber, Skeleton, ErrorState, EmptyState, PageTransition, Alert, cx } from '../../ui/index.jsx'
 import { Modal } from '../../ui/Modal.jsx'
 import { QueueTimeline } from '../../components/Cards.jsx'
 import { useToast } from '../../ui/Toast.jsx'
+
+/** Counts down the shop's grace period — how long the customer still has to reach the counter. */
+function ArriveBy({ at }) {
+  const [, tick] = useState(0)
+  useEffect(() => { const i = setInterval(() => tick((n) => n + 1), 1000); return () => clearInterval(i) }, [])
+  const left = new Date(at) - Date.now()
+  if (left <= 0) return <>Check in at the counter now — your token can be skipped.</>
+  const m = Math.floor(left / 60000), s = Math.floor((left % 60000) / 1000)
+  return <>You have <b className="num">{m}:{String(s).padStart(2, '0')}</b> to get there.</>
+}
 
 const FINAL = {
   served: { title: 'Service completed.', body: 'Thanks for using QueueLess.', icon: PartyPopper },
@@ -40,12 +52,27 @@ export default function Ticket() {
   const [error, setError] = useState('')
   const [confirm, setConfirm] = useState(false)
   const [leaving, setLeaving] = useState(false)
-  const [perm, setPerm] = useState(typeof Notification === 'undefined' ? 'denied' : Notification.permission)
+  const { refreshPush } = useNotifications()
+  const [push, setPush] = useState(null)
+  const [enabling, setEnabling] = useState(false)
 
   useEffect(() => { api(`/api/tokens/${tokenId}`).then((d) => setTicket(d.ticket)).catch((e) => setError(e.message)) }, [tokenId])
+  useEffect(() => { pushState().then(setPush) }, [])
   useTicketUpdates((t) => { if (t._id === tokenId) setTicket(t) })
   // refresh waiting numbers (timeline) on any queue change too
   useQueueWatch(ticket ? [ticket.queue._id] : [], (u) => setTicket((t) => t && { ...t, currentNumber: u.currentNumber, waitingNumbers: u.waitingNumbers, queue: { ...t.queue, isOpen: u.isOpen, avgServiceMinutes: u.avgServiceMinutes } }))
+
+  async function enablePush() {
+    setEnabling(true)
+    try {
+      await subscribePush()
+      toast.success("We'll notify you.", { description: 'You can close this tab — your phone gets the call.' })
+    } catch (e) { toast.error(e.message) } finally {
+      setPush(await pushState())
+      refreshPush()
+      setEnabling(false)
+    }
+  }
 
   async function leave() {
     setLeaving(true)
@@ -86,19 +113,26 @@ export default function Ticket() {
         ) : (
           <motion.div key="live" className="ticket-grid" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
             <div className={cx('card ticket-main', serving && 'is-serving')}>
-              {serving && <Alert tone="success" icon={Check} className="mb-4"><b>It's your turn.</b> Please go to the counter now.</Alert>}
+              {serving && (
+                <Alert tone="success" icon={Check} className="mb-4">
+                  <b>It's your turn.</b>{' '}
+                  {ticket.queue.counters > 1 && ticket.counter ? <>Go to <b>counter {ticket.counter}</b> now.</> : 'Please go to the counter now.'}
+                  {ticket.arriveBy && !ticket.arrivedAt && <> <ArriveBy at={ticket.arriveBy} /></>}
+                  {ticket.arrivedAt && <> Checked in — the counter knows you're here.</>}
+                </Alert>
+              )}
               {near && !serving && <Alert tone="warning" icon={Bell} className="mb-4"><b>Get ready.</b> Only {ticket.ahead} {ticket.ahead === 1 ? 'person' : 'people'} ahead — head back now.</Alert>}
               <span className="eyebrow">Your token</span>
               <span className="token-hero gradient-text num"><AnimatedNumber value={ticket.number} prefix="#" /></span>
               <div className="ticket-stats">
-                <div><span className="stat-label">Currently serving</span><span className="stat-value">{ticket.currentNumber == null ? '–' : <AnimatedNumber value={ticket.currentNumber} prefix="#" />}</span></div>
+                <div><span className="stat-label">{serving && ticket.counter && ticket.queue.counters > 1 ? 'Your counter' : 'Currently serving'}</span><span className="stat-value">{serving && ticket.counter && ticket.queue.counters > 1 ? ticket.counter : ticket.currentNumber == null ? '–' : <AnimatedNumber value={ticket.currentNumber} prefix="#" />}</span></div>
                 <div><span className="stat-label"><Users aria-hidden />Ahead</span><span className="stat-value"><AnimatedNumber value={ticket.ahead} /></span></div>
                 <div><span className="stat-label"><Clock aria-hidden />Estimated</span><span className="stat-value">{serving ? 'Now' : <AnimatedNumber value={ticket.etaMinutes} suffix=" min" />}</span></div>
               </div>
               <div className="progress mt-4" aria-hidden><motion.span animate={{ width: `${serving ? 100 : Math.max(6, 100 - Math.min(96, ticket.ahead * 12))}%` }} transition={{ duration: 0.5 }} /></div>
               <p className="small muted mt-3">{serving ? 'Show this token at the counter.' : "You can leave now. We'll notify you when your turn is approaching."}</p>
               <div className="row gap-2 wrap mt-4">
-                {perm === 'default' && <Button variant="secondary" size="sm" icon={Bell} onClick={() => Notification.requestPermission().then(setPerm)}>Enable notifications</Button>}
+                {push === 'off' && <Button variant="secondary" size="sm" icon={Bell} loading={enabling} onClick={enablePush}>Notify me when it's my turn</Button>}
                 {ticket.queue.location && <Button variant="secondary" size="sm" icon={Navigation} href={directionsUrl(ticket.queue.location, ticket.queue.name)} target="_blank" rel="noreferrer">Get Directions</Button>}
                 {ticket.status === 'waiting' && <Button variant="danger" size="sm" icon={LogOut} onClick={() => setConfirm(true)}>Leave Queue</Button>}
               </div>

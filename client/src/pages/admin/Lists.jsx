@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Search, Store, Users, ListOrdered, CalendarDays, ExternalLink } from 'lucide-react'
+import { Search, Store, Users, ListOrdered, CalendarDays, ExternalLink, BadgeCheck, Ban, Undo2 } from 'lucide-react'
 import { api } from '../../api.js'
 import { useAuth } from '../../auth.jsx'
 import { useFetch, useQueueWatch, applyUpdate } from '../../lib/hooks.js'
@@ -33,18 +33,46 @@ function TablePage({ title, sub, icon: Icon, rows, columns, loading, error, relo
 
 const ShopName = ({ s }) => { const cat = category(s.category); return <span className="row gap-3"><span className={cx('icon-box', s.category)} style={{ width: 32, height: 32 }}><cat.icon aria-hidden style={{ width: 16 }} /></span><span className="stack"><Link to={`/shop/${s._id}`} className="strong" style={{ color: 'inherit' }}>{s.name}</Link><span className="xs muted">{cat.label}</span></span></span> }
 
+const VERIFY = {
+  pending: { tone: 'warning', label: 'Pending' },
+  approved: { tone: 'success', label: 'Verified' },
+  suspended: { tone: 'danger', label: 'Suspended' },
+}
+
 export function Shops() {
-  const { data, loading, error, reload, setData } = useFetch('/api/queues')
+  const toast = useToast()
+  // ?all=1 is admin-only and is the only way pending/suspended shops show up — the public list hides them
+  const { data, loading, error, reload, setData } = useFetch('/api/queues', { query: { all: '1' } })
   const rows = data?.queues || []
   useQueueWatch(rows.map((s) => s._id), (u) => setData((d) => d && { queues: d.queues.map((s) => (s._id === u.queueId ? applyUpdate(s, u) : s)) }))
-  return <TablePage title="Shops" sub="Every business on the platform." icon={Store} rows={rows} loading={loading} error={error} reload={reload} empty="No shops yet." searchKeys={[(s) => s.name, (s) => s.category, (s) => s.address?.city]}
+  const pending = rows.filter((s) => s.status === 'pending').length
+
+  async function setStatus(s, status) {
+    try {
+      const { shop } = await api(`/api/admin/shops/${s._id}`, { method: 'PATCH', body: { status } })
+      setData((d) => ({ queues: d.queues.map((x) => (x._id === shop._id ? { ...x, status: shop.status } : x)) }))
+      toast.success(`${shop.name} is now ${VERIFY[shop.status].label.toLowerCase()}.`)
+    } catch (e) { toast.error(e.message) }
+  }
+
+  // newest-looking work first: anything waiting on a decision floats to the top
+  const sorted = [...rows].sort((a, b) => (b.status === 'pending') - (a.status === 'pending'))
+  return <TablePage title="Shops" sub="Every business on the platform. Approve a new one before customers can find it." icon={Store} rows={sorted} loading={loading} error={error} reload={reload} empty="No shops yet." searchKeys={[(s) => s.name, (s) => s.category, (s) => s.address?.city, (s) => s.status]}
+    extra={pending > 0 && <Badge tone="warning" size="lg">{pending} awaiting approval</Badge>}
     columns={[
       { h: 'Shop', cell: (s) => <ShopName s={s} /> },
       { h: 'Address', cell: (s) => <span className="small muted">{fmtAddress(s.address) || '—'}</span> },
       { h: 'Location', cell: (s) => s.location ? <Badge tone="success">On map</Badge> : <Badge tone="warning">No pin</Badge> },
-      { h: 'Services', cell: (s) => <span className="small">{s.services?.length || 0}</span> },
-      { h: 'Status', cell: (s) => <Badge tone={s.isOpen ? 'open' : 'closed'}>{s.isOpen ? <><LiveDot />Open</> : 'Closed'}</Badge> },
-      { h: '', w: 48, cell: (s) => <Button variant="ghost" size="sm" icon={ExternalLink} to={`/shop/${s._id}`} aria-label={`Open ${s.name}`} /> },
+      { h: 'Verification', cell: (s) => { const v = VERIFY[s.status] || VERIFY.approved; return <Badge tone={v.tone}>{v.label}</Badge> } },
+      { h: 'Queue', cell: (s) => <Badge tone={s.isOpen ? 'open' : 'closed'}>{s.isOpen ? <><LiveDot />Open</> : 'Closed'}</Badge> },
+      { h: '', w: 210, cell: (s) => (
+        <span className="row gap-2" style={{ justifyContent: 'flex-end' }}>
+          {s.status === 'pending' && <Button variant="primary" size="sm" icon={BadgeCheck} onClick={() => setStatus(s, 'approved')}>Approve</Button>}
+          {s.status === 'approved' && <Button variant="ghost" size="sm" icon={Ban} onClick={() => setStatus(s, 'suspended')}>Suspend</Button>}
+          {s.status === 'suspended' && <Button variant="secondary" size="sm" icon={Undo2} onClick={() => setStatus(s, 'approved')}>Restore</Button>}
+          <Button variant="ghost" size="sm" icon={ExternalLink} to={`/shop/${s._id}`} aria-label={`Open ${s.name}`} />
+        </span>
+      ) },
     ]} />
 }
 
@@ -65,7 +93,7 @@ export function UsersPage({ vendors }) {
 }
 
 export function Queues() {
-  const { data, loading, error, reload, setData } = useFetch('/api/queues')
+  const { data, loading, error, reload, setData } = useFetch('/api/queues', { query: { all: '1' } })
   const rows = data?.queues || []
   useQueueWatch(rows.map((s) => s._id), (u) => setData((d) => d && { queues: d.queues.map((s) => (s._id === u.queueId ? applyUpdate(s, u) : s)) }))
   const sorted = [...rows].sort((a, b) => b.waitingCount - a.waitingCount)

@@ -294,7 +294,7 @@ button.service-card:hover { border-color: var(--text-3); }
 .live-who { display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; min-height: 48px; }
 .live-who b { font-size: 1.125rem; }
 .live-next { font-size: 1.5rem; letter-spacing: .04em; --h: 76px; border-radius: 18px; }
-.live-secondary { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s-2); }
+.live-secondary { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: var(--s-2); }
 .live-list { max-height: calc(100dvh - 120px); overflow: auto; }
 .wait-row { display: flex; align-items: center; gap: var(--s-3); padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface); }
 .wait-row.next { border-color: var(--primary); background: var(--primary-soft); }
@@ -346,3 +346,37 @@ button.service-card:hover { border-color: var(--text-3); }
 .place-results .menu-item { white-space: normal; }
 .map-dark .leaflet-tile-pane { filter: invert(1) hue-rotate(195deg) brightness(.82) contrast(.92) saturate(.55); }
 .map-dark.leaflet-container { background: #0f1522; }
+
+/* ---------- Counter QR ---------- */
+.qr-poster { display: flex; gap: var(--s-5); align-items: flex-start; flex-wrap: wrap; }
+/* the white frame is deliberate in both themes — phone cameras need dark-on-light to lock on */
+.qr-frame { background: #fff; padding: var(--s-3); border-radius: var(--r-sm); border: 1px solid var(--border); line-height: 0; flex: none; }
+.qr-canvas { display: block; }
+.qr-link { display: block; font-size: .8rem; color: var(--text-2); background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-sm); padding: 8px 10px; }
+@media (max-width: 560px) { .qr-poster { gap: var(--s-4); } }
+
+/* ---------- Multi-counter live queue ---------- */
+.counter-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(258px, 1fr)); gap: var(--s-4); align-items: start; }
+.live-now.tile { padding: var(--s-5); gap: var(--s-3); cursor: pointer; }
+.live-now.tile .live-number { font-size: clamp(3rem, 7vw, 4.75rem); padding: var(--s-2) 0; }
+.live-now.tile .live-who { min-height: 42px; }
+.live-now.tile .live-who b { font-size: 1rem; }
+.live-now.tile .live-next { font-size: 1rem; --h: 52px; border-radius: 14px; }
+/* which counter the N / S / C keys drive */
+.live-now.active { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
+.grace { display: inline-flex; align-items: center; gap: 6px; font-size: .75rem; font-weight: 600; color: var(--text-2); white-space: nowrap; }
+.grace svg { width: 14px; height: 14px; }
+.grace.ok { color: var(--success); }
+.grace.soon { color: var(--warning); }
+.grace.over { color: var(--danger); }
+@media (max-width: 639px) { .counter-grid { grid-template-columns: 1fr; } }
+
+/* ---------- Busy-times heatmap ---------- */
+.heat { margin: 0; }
+.heat-grid { display: grid; grid-template-columns: 34px repeat(24, minmax(0, 1fr)); gap: 3px; align-items: center; }
+.heat-day, .heat-hour { font-size: .65rem; color: var(--text-3); line-height: 1; }
+.heat-hour { text-align: center; }
+.heat-cell { aspect-ratio: 1; border-radius: 3px; min-height: 12px; background: color-mix(in srgb, var(--primary) calc(var(--v) * 88%), var(--surface-2)); }
+.heat-legend { display: flex; align-items: center; gap: var(--s-2); margin-top: var(--s-3); }
+.heat-scale { flex: none; width: 72px; height: 8px; border-radius: var(--r-pill); background: linear-gradient(90deg, var(--surface-2), var(--primary)); }
+@media (max-width: 639px) { .heat-grid { grid-template-columns: 28px repeat(24, minmax(0, 1fr)); gap: 2px; } .heat-cell { min-height: 8px; } }

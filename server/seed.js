@@ -13,7 +13,7 @@ const img = (id) => `https://images.unsplash.com/${id}?w=1200&q=70&auto=format&f
 // dLat/dLng are offsets from CENTER in degrees (~0.01 ≈ 1.1 km). queue = people in line (first one is being served); served = done earlier today.
 const SHOPS = [
   // --- medical ---
-  { name: 'Dr. Sharma Clinic', category: 'medical', dLat: 0.004, dLng: 0.006, avg: 6, queue: 3, served: 9, street: '12 Mall Road', phone: '+91 98765 11111', image: img('photo-1519494026892-80bbd2d6fd0d'),
+  { name: 'Dr. Sharma Clinic', category: 'medical', dLat: 0.004, dLng: 0.006, avg: 6, queue: 3, served: 9, grace: 5, street: '12 Mall Road', phone: '+91 98765 11111', image: img('photo-1519494026892-80bbd2d6fd0d'),
     description: 'Family physician. Walk-ins welcome, appointments preferred.', services: [['General Consultation', 10], ['Follow-up', 6], ['Emergency', 15]] },
   { name: 'Smile Dental Care', category: 'medical', dLat: -0.03, dLng: 0.03, avg: 18, queue: 2, served: 4, street: '7 Swaroop Nagar', phone: '+91 98765 66666', image: img('photo-1606811841689-23dfddce3e95'),
     description: 'Dental check-ups, cleaning and orthodontics.', services: [['Check-up', 15], ['Cleaning', 25], ['Filling', 30]] },
@@ -82,7 +82,8 @@ export async function seed() {
     const vendor = await upsertUser(`${s.name} Owner`, `${slug(s.name)}@example.com`, 'staff');
     const queue = await Queue.create({
       name: s.name, description: s.description, category: s.category, owner: vendor._id, avgServiceMinutes: s.avg, image: s.image,
-      isOpen: s.open !== false, phone: s.phone, email: vendor.email,
+      isOpen: s.open !== false, status: 'approved', phone: s.phone, email: vendor.email,
+      counters: s.counters ?? (s.category === 'bank' || s.category === 'government' ? 3 : 1), graceMinutes: s.grace ?? 0,
       address: { street: s.street, city: 'Kanpur', state: 'Uttar Pradesh', pincode: String(208001 + (i % 25)) },
       hours: { open: s.hours?.[0] ?? '09:00', close: s.hours?.[1] ?? '19:00' },
       services: s.services.map(([name, minutes]) => ({ name, minutes })),
@@ -95,11 +96,13 @@ export async function seed() {
       const createdAt = new Date(now - (s.served - k) * s.avg * 60000 * 1.4 - 30 * 60000);
       const calledAt = new Date(createdAt.getTime() + s.avg * 60000 * (0.6 + (k % 3) * 0.3));
       const t = await Token.create({ queue: queue._id, user: people[(k * 7 + i) % people.length]._id, number: ++counter, service: queue.services[k % queue.services.length].name, status: k % 9 === 8 ? 'skipped' : 'served', calledAt, doneAt: new Date(calledAt.getTime() + s.avg * 60000) });
-      await Token.updateOne({ _id: t._id }, { $set: { createdAt } });
+      await Token.collection.updateOne({ _id: t._id }, { $set: { createdAt } }); // .collection: Mongoose strips createdAt from $set
     }
+    // one customer at each counter, the rest waiting
     for (let k = 0; k < s.queue; k++) {
-      const t = await Token.create({ queue: queue._id, user: people[(k + i * 3) % people.length]._id, number: ++counter, service: queue.services[k % queue.services.length].name, status: k === 0 ? 'serving' : 'waiting', calledAt: k === 0 ? new Date(now - 3 * 60000) : undefined });
-      if (k === 0) queue.currentToken = t._id;
+      const atCounter = k < queue.counters;
+      const t = await Token.create({ queue: queue._id, user: people[(k + i * 3) % people.length]._id, number: ++counter, service: queue.services[k % queue.services.length].name, status: atCounter ? 'serving' : 'waiting', counter: atCounter ? k + 1 : undefined, calledAt: atCounter ? new Date(now - (3 + k) * 60000) : undefined, arrivedAt: atCounter && k % 2 ? new Date(now - k * 60000) : undefined });
+      if (atCounter) queue.currentToken = t._id;
     }
     queue.counter = counter;
     queue.counterDate = day;
