@@ -21,7 +21,7 @@ function useTicker(on) {
 function Grace({ token, minutes }) {
   useTicker(true)
   const left = new Date(token.calledAt).getTime() + minutes * 60000 - Date.now()
-  if (left <= 0) return <span className="grace over"><AlarmClock aria-hidden />No-show — auto-skipping</span>
+  if (left <= 0) return <span className="grace over"><AlarmClock aria-hidden />No-show</span>
   const m = Math.floor(left / 60000), s = Math.floor((left % 60000) / 1000)
   return <span className={cx('grace', left < 60000 && 'soon')}><AlarmClock aria-hidden />{m}:{String(s).padStart(2, '0')} to arrive</span>
 }
@@ -146,7 +146,7 @@ export default function LiveQueue() {
                 {state.waiting.map((t, i) => (
                   <motion.li key={t._id} layout initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, x: -20, transition: { duration: 0.15 } }} transition={{ duration: 0.25 }} className={cx('wait-row', i === 0 && 'next')}>
                     <span className="wait-num">#{t.number}</span>
-                    <span className="stack grow" style={{ minWidth: 0 }}><b className="truncate">{t.user?.name || 'Customer'}</b><span className="xs muted row gap-2">{t.service || 'Walk-in'}<span aria-hidden>·</span><Clock aria-hidden style={{ width: 12 }} />{timeAgo(t.createdAt)}</span></span>
+                    <span className="stack grow" style={{ minWidth: 0 }}><b className="truncate">{t.user?.name || 'Customer'}</b><span className="xs muted row gap-2 wait-meta"><span className="truncate">{t.service || 'Walk-in'}</span><span aria-hidden>·</span><Clock aria-hidden style={{ width: 12 }} />{timeAgo(t.createdAt)}</span></span>
                     {t.priority ? <Badge tone="priority">Priority</Badge> : i === 0 ? <Badge tone="primary">Up next</Badge> : null}
                   </motion.li>
                 ))}

@@ -66,10 +66,13 @@ export default function Analytics() {
             ) : <p className="muted small">No tokens in this range yet — the chart fills in as customers join.</p>}
           </section>
 
-          <section className="card">
-            <div className="between mb-4"><div><h3>Busy times</h3><p className="small muted">Every token in this range, by weekday and hour. Darker means busier.</p></div></div>
-            {data.total ? <HeatMap data={data.heat} ariaLabel="Tokens issued by weekday and hour" /> : <p className="muted small">Nothing to map yet. Pick a longer range, or come back once you've served a few days.</p>}
-          </section>
+          {/* a weekday x hour map of a single day is one lit cell and says nothing — only worth drawing over a range */}
+          {multiDay && (
+            <section className="card">
+              <div className="between mb-4"><div><h3>Busy times</h3><p className="small muted">Every token in this range, by weekday and hour. Darker means busier.</p></div></div>
+              {data.total ? <HeatMap data={data.heat} ariaLabel="Tokens issued by weekday and hour" /> : <p className="muted small">Nothing to map yet — come back once you've served a few days.</p>}
+            </section>
+          )}
 
           <p className="xs faint">Days run midnight to midnight UTC. “Left” counts customers who removed themselves from the queue.</p>
         </>

@@ -294,13 +294,16 @@ button.service-card:hover { border-color: var(--text-3); }
 .live-who { display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; min-height: 48px; }
 .live-who b { font-size: 1.125rem; }
 .live-next { font-size: 1.5rem; letter-spacing: .04em; --h: 76px; border-radius: 18px; }
-.live-secondary { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: var(--s-2); }
+.live-secondary { display: flex; flex-wrap: wrap; gap: var(--s-2); }
+.live-secondary > * { flex: 1 1 auto; min-width: 0; }
 .live-list { max-height: calc(100dvh - 120px); overflow: auto; }
 .wait-row { display: flex; align-items: center; gap: var(--s-3); padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface); }
 .wait-row.next { border-color: var(--primary); background: var(--primary-soft); }
+/* keep "service · 12 min ago" on one line and shorten the service instead of breaking mid-phrase */
+.wait-meta { flex-wrap: nowrap; min-width: 0; white-space: nowrap; }
 .wait-num { font-weight: 700; font-size: 1.125rem; font-variant-numeric: tabular-nums; letter-spacing: -.02em; width: 56px; flex: none; }
 @media (max-width: 1023px) { .live { grid-template-columns: 1fr; } .live-list { max-height: none; } }
-@media (max-width: 639px) { .live-now { padding: var(--s-5) var(--s-4); } .live-secondary { grid-template-columns: 1fr 1fr; } .live-secondary > :last-child { grid-column: 1 / -1; } }
+@media (max-width: 639px) { .live-now { padding: var(--s-5) var(--s-4); } .live-secondary > * { flex-basis: calc(50% - var(--s-2)); } }
 .dash-menu { display: none; }
 @media (max-width: 1023px) { .side-collapse { display: none; } }
 @media (max-width: 1023px) { .dash-menu { display: inline-flex; } }
@@ -349,6 +352,7 @@ button.service-card:hover { border-color: var(--text-3); }
 
 /* ---------- Counter QR ---------- */
 .qr-poster { display: flex; gap: var(--s-5); align-items: flex-start; flex-wrap: wrap; }
+.qr-poster > .stack { flex: 1 1 240px; min-width: 0; }
 /* the white frame is deliberate in both themes — phone cameras need dark-on-light to lock on */
 .qr-frame { background: #fff; padding: var(--s-3); border-radius: var(--r-sm); border: 1px solid var(--border); line-height: 0; flex: none; }
 .qr-canvas { display: block; }
@@ -356,15 +360,17 @@ button.service-card:hover { border-color: var(--text-3); }
 @media (max-width: 560px) { .qr-poster { gap: var(--s-4); } }
 
 /* ---------- Multi-counter live queue ---------- */
-.counter-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(258px, 1fr)); gap: var(--s-4); align-items: start; }
+.counter-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(272px, 1fr)); gap: var(--s-4); align-items: stretch; }
 .live-now.tile { padding: var(--s-5); gap: var(--s-3); cursor: pointer; }
 .live-now.tile .live-number { font-size: clamp(3rem, 7vw, 4.75rem); padding: var(--s-2) 0; }
-.live-now.tile .live-who { min-height: 42px; }
+.live-now.tile .live-who { min-height: 62px; }
 .live-now.tile .live-who b { font-size: 1rem; }
 .live-now.tile .live-next { font-size: 1rem; --h: 52px; border-radius: 14px; }
 /* which counter the N / S / C keys drive */
 .live-now.active { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
 .grace { display: inline-flex; align-items: center; gap: 6px; font-size: .75rem; font-weight: 600; color: var(--text-2); white-space: nowrap; }
+/* the counter label must never wrap behind the status chip next to it */
+.live-now .eyebrow { white-space: nowrap; }
 .grace svg { width: 14px; height: 14px; }
 .grace.ok { color: var(--success); }
 .grace.soon { color: var(--warning); }
