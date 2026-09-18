@@ -44,7 +44,7 @@ docker compose run --rm app node scripts/vapid.js    # generate push keys
 
 ```bash
 # server — embedded MongoDB persists in server/data, nothing to install
-cd server && npm install   # create server/.env from the Environment section below
+cd server && cp .env.example .env && npm install   # then fill in .env
 npm run seed        # sample shops + accounts, password "password" (safe to re-run)
 npm run dev         # http://localhost:4000
 
