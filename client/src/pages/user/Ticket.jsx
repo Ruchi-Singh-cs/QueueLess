@@ -3,7 +3,7 @@ import { Link, Navigate, useParams, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Users, Clock, MapPin, Navigation, Bell, LogOut, Check, Ticket as TicketIcon, PartyPopper } from 'lucide-react'
 import { api } from '../../api.js'
-import { useFetch, useTicketUpdates, useQueueWatch } from '../../lib/hooks.js'
+import { useFetch, useTicketUpdates, useQueueWatch, useLiveEta } from '../../lib/hooks.js'
 import { pushState, subscribePush } from '../../lib/push.js'
 import { useNotifications } from '../../lib/notifications.jsx'
 import { directionsUrl } from '../../lib/geo.js'
@@ -59,6 +59,7 @@ export default function Ticket() {
   useEffect(() => { api(`/api/tokens/${tokenId}`).then((d) => setTicket(d.ticket)).catch((e) => setError(e.message)) }, [tokenId])
   useEffect(() => { pushState().then(setPush) }, [])
   useTicketUpdates((t) => { if (t._id === tokenId) setTicket(t) })
+  const eta = useLiveEta(ticket)
   // refresh waiting numbers (timeline) on any queue change too
   useQueueWatch(ticket ? [ticket.queue._id] : [], (u) => setTicket((t) => t && { ...t, currentNumber: u.currentNumber, waitingNumbers: u.waitingNumbers, queue: { ...t.queue, isOpen: u.isOpen, avgServiceMinutes: u.avgServiceMinutes } }))
 
@@ -133,7 +134,7 @@ export default function Ticket() {
               <div className="ticket-stats">
                 <div><span className="stat-label">{serving && ticket.counter && ticket.queue.counters > 1 ? 'Your counter' : 'Currently serving'}</span><span className="stat-value">{serving && ticket.counter && ticket.queue.counters > 1 ? ticket.counter : ticket.currentNumber == null ? '–' : <AnimatedNumber value={ticket.currentNumber} prefix="#" />}</span></div>
                 <div><span className="stat-label"><Users aria-hidden />Ahead</span><span className="stat-value"><AnimatedNumber value={ticket.ahead} /></span></div>
-                <div><span className="stat-label"><Clock aria-hidden />Estimated</span><span className="stat-value">{serving ? 'Now' : <AnimatedNumber value={ticket.etaMinutes} suffix=" min" />}</span></div>
+                <div><span className="stat-label"><Clock aria-hidden />Estimated</span><span className="stat-value">{serving ? 'Now' : <AnimatedNumber value={eta} suffix=" min" />}</span></div>
               </div>
               <div className="progress mt-4" aria-hidden><motion.span animate={{ width: `${serving ? 100 : Math.max(6, 100 - Math.min(96, ticket.ahead * 12))}%` }} transition={{ duration: 0.5 }} /></div>
               <p className="small muted mt-3">{serving ? 'Show this token at the counter.' : "You can leave now. We'll notify you when your turn is approaching."}</p>

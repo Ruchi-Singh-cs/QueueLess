@@ -169,6 +169,7 @@ export async function ticketFor(token) {
     waitingNumbers,
     ahead,
     etaMinutes,
+    etaAt: new Date(), // the client counts the estimate down from this moment between updates
     createdAt: token.createdAt,
   };
 }

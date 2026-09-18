@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { MapPin, Clock, Users, ArrowRight, Bell, CheckCircle2, AlertTriangle, Info, XCircle, CalendarDays, Ticket, Check } from 'lucide-react'
 import { category, fmtKm, fmtMin, fmtDate, fmtTime, timeAgo } from '../lib/format.js'
+import { useLiveEta } from '../lib/hooks.js'
 import { Badge, Button, Card, LiveDot, AnimatedNumber, cx, fadeUp } from '../ui/index.jsx'
 
 /** Shop in a list (nearby, home, search). */
@@ -40,6 +41,7 @@ export function ShopCard({ shop, selected, onSelect, compact, animate = true }) 
 /** A customer's active token, compact. */
 export function TokenCard({ ticket, className }) {
   const live = ticket.status === 'waiting' || ticket.status === 'serving'
+  const eta = useLiveEta(ticket)
   return (
     <Link to={`/t/${ticket._id}`} className={cx('card card-hover token-card', ticket.status === 'serving' && 'is-serving', className)}>
       <div className="between">
@@ -53,7 +55,7 @@ export function TokenCard({ ticket, className }) {
         <span className="token-big gradient-text"><AnimatedNumber value={ticket.number} prefix="#" /></span>
         <div className="token-card-meta">
           <span><Users aria-hidden /><AnimatedNumber value={ticket.ahead} /> ahead</span>
-          <span><Clock aria-hidden />~{fmtMin(ticket.etaMinutes)}</span>
+          <span><Clock aria-hidden />~{fmtMin(eta)}</span>
           <span>Serving <b className="num">{ticket.currentNumber == null ? '–' : `#${ticket.currentNumber}`}</b></span>
         </div>
       </div>

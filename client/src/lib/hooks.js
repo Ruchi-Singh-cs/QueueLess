@@ -51,6 +51,25 @@ export function useTicketUpdates(onTicket) {
   }, [])
 }
 
+/**
+ * A ticket's estimated wait, ticking down as wall-clock time passes since the server computed it.
+ * The server refreshes the estimate on every queue change; this keeps it moving in between.
+ */
+export function useLiveEta(ticket) {
+  const [now, setNow] = useState(Date.now())
+  useEffect(() => {
+    if (ticket?.status !== 'waiting') return
+    setNow(Date.now())
+    const i = setInterval(() => setNow(Date.now()), 10000)
+    return () => clearInterval(i)
+  }, [ticket?.status, ticket?.etaAt])
+  if (!ticket) return 0
+  if (ticket.status !== 'waiting' || !ticket.etaAt) return ticket.etaMinutes
+  const elapsed = Math.max(0, now - new Date(ticket.etaAt)) / 60000
+  // never reaches 0 while someone is still ahead — "1 min" is more honest than "no wait"
+  return Math.max(ticket.ahead ? 1 : 0, Math.round(ticket.etaMinutes - elapsed))
+}
+
 /** Apply a queue:update payload to a shop summary object. */
 export const applyUpdate = (q, u) => ({ ...q, isOpen: u.isOpen, avgServiceMinutes: u.avgServiceMinutes, currentNumber: u.currentNumber, waitingCount: u.waitingNumbers.length, etaMinutes: u.etaMinutes ?? Math.round(u.waitingNumbers.length * u.avgServiceMinutes) })
 
