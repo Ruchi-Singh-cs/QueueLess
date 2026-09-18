@@ -1,148 +1,193 @@
 # QueueLess — Skip the wait.
 
-Virtual queue management: find nearby businesses on a map, see the live queue, join remotely, get a token, track your position in real time, get notified when your turn is near, and arrive when it matters. Businesses run their queue from a one-tap counter screen.
+Virtual queues for clinics, salons, banks, government offices and repair shops. Customers find a business on the map, see the live queue, take a token from their phone, track their position in real time and get a push notification when their turn is near. Businesses run the queue from a one-tap counter screen.
 
 ```
-Dr. Sharma Clinic
-Currently serving: #21   Your token: #27   People ahead: 6   ETA: 35 min
+Dr. Sharma Clinic · 2 counters
+Counter 1: #536 (2:47 to arrive)   Counter 2: #537 ✓ arrived   Waiting: 4   ETA: 19 min
 ```
 
-## Stack
+## Accounts
 
-- **server/** — Node 20+, Express 5, Mongoose 8 (2dsphere geo queries), Socket.IO 4, JWT, bcryptjs. ESM. No `dotenv` (`node --env-file`). Vite proxy in dev; Express serves `client/dist` in prod (same origin).
-- **client/** — Vite + React 18, react-router 6, framer-motion, lucide-react (single icon set), socket.io-client, maps via OpenStreetMap/Leaflet (default, free) or Google Maps JavaScript API (Places + Marker) when a key is set. Plain CSS design system (`src/styles/`), light + dark mode.
+All seeded accounts use the password **`password`** unless noted.
 
-## Run with Docker
+| Role | Email | Password | Lands on |
+|---|---|---|---|
+| **Admin** (yours) | `rs9538605@gmail.com` | `ruchi@123` | `/admin` |
+| Admin (seeded) | `admin@example.com` | `password` | `/admin` |
+| Customer | `user@example.com` | `password` | `/queue` — a live ticket |
+| Vendor — demo clinic | `dr-sharma-clinic@example.com` | `password` | `/vendor` — 2 counters mid-service |
+| Vendor — awaiting approval | `newshop@example.com` | `password` | `/vendor` — pending verification |
+| Any other vendor | `<shop-name-slug>@example.com` e.g. `glow-salon@example.com`, `city-bank-main-branch@example.com` | `password` | `/vendor` |
+| Other customers | `priya@example.com`, `rahul@example.com`, `neha@example.com` … (first names from the seed) | `password` | `/app` |
 
-Nothing to install but Docker itself — no Node, no MongoDB, no `.env` to fill in:
+Registering with the email in `ADMIN_EMAIL` (`server/.env`) makes that account an admin. Admins can change any user's role at **Admin → Users**.
+
+> These are demo credentials for a local database. Change `JWT_SECRET` and the admin password before exposing the app anywhere public.
+
+## Run
+
+### With Docker (nothing else to install)
 
 ```bash
-docker compose up --build     # http://localhost:4000
+docker compose up --build        # → http://localhost:4000
 ```
 
-One image serves the API, the WebSocket and the built front end on a single port; MongoDB runs
-beside it with a named volume, so your data survives `docker compose down`. The first start seeds
-the demo shops and stages the walkthrough in [DEMO.md](DEMO.md) — log in with any account listed
-there, password `password`.
+One image serves the API, WebSocket and the built front end on a single port; MongoDB runs beside it on a named volume. The first start seeds the demo and stages the walkthrough in [DEMO.md](DEMO.md).
 
 ```bash
-docker compose down           # stop (data kept)
-docker compose down -v        # stop and wipe the database
-docker compose exec app node demo.js    # re-stage the demo without restarting
-docker compose run --rm app node vapid.js   # generate VAPID keys for push
+docker compose down              # stop, keep data
+docker compose down -v           # stop and wipe
+docker compose exec app node demo.js         # re-stage the demo
+docker compose run --rm app node vapid.js    # generate push keys
 ```
 
-Notifications are off until you set VAPID keys: generate a pair with the command above, put them in
-a `.env` next to `docker-compose.yml` as `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY`, then
-`docker compose up -d`. Without them the app runs fine and simply reports push as unavailable.
-`JWT_SECRET` defaults to a placeholder — override it for anything beyond a local demo.
-
-## Run without Docker
+### Without Docker
 
 ```bash
-# 1. server (embedded MongoDB persists in server/data — no install needed)
+# server — embedded MongoDB persists in server/data, nothing to install
 cd server && cp .env.example .env && npm install
-npm run seed      # demo shops around Kanpur + accounts (password: "password"); safe to re-run
-npm run dev       # http://localhost:4000
+npm run demo        # seeds shops + accounts and stages the demo (safe to re-run)
+npm run dev         # http://localhost:4000
 
-# 2. client (separate terminal)
-cd client && cp .env.example .env   # add VITE_GOOGLE_MAPS_API_KEY to enable Google Maps
-npm install && npm run dev          # http://localhost:5173
-
-# production: cd client && npm run build, then the server serves it on :4000
-# tests: cd server && npm test
+# client — second terminal
+cd client && npm install && npm run dev      # http://localhost:5173
 ```
 
-Demo logins after `npm run seed` (password `password`): `admin@example.com` (admin), `user@example.com` (customer), `dr-sharma-clinic@example.com` / `glow-salon@example.com` / … (vendors).
+`npm run seed` seeds without staging; `npm test` runs the server suite; `npm run build` in `client/` produces `dist/`, which the server serves on `:4000` in production.
 
-### Environment
+Only one process can use the embedded database at a time. Starting a second server, or a server while `npm run demo` is still running, fails immediately with a message saying so.
+
+### The demo
+
+`npm run demo` (or the Docker first start) sets up **Dr. Sharma Clinic** with two counters mid-service, a no-show timer counting down, a skipped customer ready to recall, tokens served earlier today, a month of history for the charts, three upcoming appointments for the customer, and **Nova Skin & Hair Studio** awaiting admin approval. Plus 22 hand-written shops and 100 generated ones within 60 km of the centre, all with addresses, hours, services, photos and live queues. **Re-run it before presenting** — the no-show timer advances the queue on its own after ~10 minutes.
+
+[DEMO.md](DEMO.md) is the 12-step walkthrough.
+
+## Environment
 
 `server/.env`
 ```
 PORT=4000
 # MONGO_URI=mongodb://127.0.0.1:27017/queueless   # unset → embedded db in server/data
 JWT_SECRET=change-me
-ADMIN_EMAIL=admin@example.com   # registering with this email yields role=admin
-# SEED=1                        # seed demo data on startup
+ADMIN_EMAIL=rs9538605@gmail.com   # registering with this email yields role=admin
+
+# Web push (npm run vapid generates a pair). Blank → push reported as unavailable, app still works.
+VAPID_PUBLIC_KEY=
+VAPID_PRIVATE_KEY=
+VAPID_SUBJECT=mailto:you@example.com
+
+# AUTO_APPROVE_SHOPS=1     # new shops go live without admin approval (default: pending)
+
+# Demo city: where seed/demo place the shops
+SEED_LAT=26.8492
+SEED_LNG=80.8586
+SEED_CITY=Lucknow
+SEED_STATE=Uttar Pradesh
+SEED_PINCODE=226001
+SEED_EXTRA=100           # generated shops on top of the 22 named ones (default 0)
+SEED_RADIUS_KM=60
 ```
 
 `client/.env`
 ```
-VITE_GOOGLE_MAPS_API_KEY=       # Maps JavaScript API + Places API (New); restrict to your domains
-VITE_GOOGLE_MAPS_MAP_ID=        # optional cloud map style id (defaults to DEMO_MAP_ID)
+VITE_GOOGLE_MAPS_API_KEY=       # optional; without it maps use OpenStreetMap/Leaflet (free, nothing to configure)
+VITE_GOOGLE_MAPS_MAP_ID=
 ```
-Without a Google key the app uses the free **OpenStreetMap** provider: CARTO basemap tiles via Leaflet, Nominatim for address search in the vendor location picker (public endpoint, ~1 request/s — fine for a demo), Google Maps URLs for directions. Nothing to configure.
+
+Push notifications need `localhost` or HTTPS (a browser rule for service workers). A plain `http://192.168.x.x` LAN address will not deliver them.
+
+## Features
+
+**Customer** — map of nearby shops with live wait times, location accuracy shown honestly with a map pin to correct it; join a queue with a service; live ticket with position, ETA, which counter to go to and an arrive-by countdown; push notifications that reach a closed tab; appointments that check in as priority tokens; history.
+
+**Vendor** — one tile per counter with Next / Skip / Complete, Arrived check-in, grace-period auto-skip of no-shows, one-tap Recall; keyboard-driven (`N` `S` `C`, `1`–`n` picks the counter); shop profile, map pin, services with durations, hours; printable counter QR; analytics for today / 7 / 30 days with a weekday×hour heatmap.
+
+**Admin** — approve, suspend or restore businesses (new ones are hidden until approved); users and roles; platform stats.
 
 ## Roles & routes
 
-| role | client routes | can |
+| role | routes | can |
 |---|---|---|
-| guest | `/` landing, `/nearby`, `/shop/:id`, `/login`, `/register` | browse shops + live queues on the map |
-| user | `/app`, `/queue`, `/t/:tokenId`, `/appointments`, `/notifications`, `/profile` | join/leave queues, book/cancel appointments, live token tracking, notifications |
-| staff (vendor) | `/vendor` overview, `/queue`, `/appointments`, `/shop`, `/location`, `/services`, `/analytics`, `/settings` | create shops, manage **own** queue (next/skip/complete/pause), shop profile, map pin, services, check-in appointments, stats |
-| admin | `/admin` dashboard, `/shops`, `/users`, `/vendors`, `/queues`, `/appointments`, `/analytics`, `/settings` | everything, on any shop; change user roles |
+| guest | `/` `/nearby` `/shop/:id` `/login` `/register` | browse approved shops and live queues |
+| user | `/app` `/queue` `/t/:tokenId` `/appointments` `/notifications` `/profile` | join/leave, book, track, get notified |
+| staff | `/vendor` + `queue` `appointments` `shop` `location` `services` `analytics` `settings` | run **own** shops |
+| admin | `/admin` + `shops` `users` `vendors` `queues` `appointments` `analytics` `settings` | everything, any shop; verify shops; change roles |
 
-Registration accepts `role` of `user` or `staff`. `email === ADMIN_EMAIL` → admin.
+Opening a route your role can't use redirects to your home and says why.
 
 ## Data model
 
 ```
-User        { name, email (unique), passwordHash, role: user|staff|admin, timestamps }
-Queue       { name, description, owner → User, avgServiceMinutes = 5, isOpen = true, counter, counterDate, currentToken → Token,
-  (= shop)    category: medical|salon|bank|government|repair|other, phone, email, image,
-              address { street, city, state, pincode }, hours { open '09:00', close '18:00' },
-              services: [{ name, minutes }],
-              location: GeoJSON Point { type: 'Point', coordinates: [lng, lat] } }   index: 2dsphere on location
-Token       { queue, user, number, priority, service, status: waiting|serving|served|skipped|left, calledAt, doneAt }
-Appointment { queue, user, at, service, note, status: booked|checked_in|cancelled|completed, token }
+User             { name, email (unique), passwordHash, role: user|staff|admin }
+Queue (= shop)   { name, description, owner→User, category, status: pending|approved|suspended,
+                   avgServiceMinutes, isOpen, counters (1–20), graceMinutes (0 = off),
+                   counter, counterDate, currentToken→Token,
+                   phone, email, image, address{street,city,state,pincode}, hours{open,close},
+                   services[{name, minutes}], location: GeoJSON Point [lng, lat] (2dsphere) }
+Token            { queue, user, number, priority, service, status: waiting|serving|served|skipped|left,
+                   counter, calledAt, arrivedAt, doneAt, pushed[] }        unique: one active token per user per queue
+Appointment      { queue, user, at, service, note, status: booked|checked_in|cancelled|completed, token }
+PushSubscription { user, endpoint (unique), keys{p256dh, auth}, userAgent }
 ```
 
 ## Queue rules
 
-- Token numbers are per-queue and reset daily (UTC). One active token per user per queue (409 otherwise). Closed queue → 400.
-- Waiting order: `priority` desc, then `number` asc. Checked-in appointments become priority tokens.
-- **Next**: current `serving` → `served`, rolling average `avg = 0.7*avg + 0.3*minutes`, first waiting → `serving`. **Skip**: same but `skipped`. **Complete**: current → `served` without calling anyone.
-- Ticket math: `ahead = waiting before me + (1 if someone is being served)`, `etaMinutes = round(ahead * avgServiceMinutes)`.
+- Token numbers are per shop and reset at midnight UTC. One active token per user per shop; closed or unapproved shop → can't join.
+- Order: `priority` desc, then `number` asc. Checked-in appointments and recalled tokens are priority.
+- Each counter serves one token. **Next** completes that counter's token and calls the next waiting one to it. **Skip** marks it skipped. **Complete** finishes without calling anyone. Reducing `counters` returns anyone stranded above the new limit to the front of the line.
+- **Grace period**: a called customer who hasn't been marked **Arrived** within `graceMinutes` is auto-skipped (sweeper runs every 20 s). **Recall** puts a skipped customer back at the front with priority and re-arms their alert.
+- **ETA** is service-aware: the sum of each token's service duration ahead of you, plus remaining time at the counters, divided by the number of counters. `avgServiceMinutes` is learned: `0.7·avg + 0.3·actual` on every completion.
+- Analytics days run midnight to midnight UTC.
 
-## HTTP API (JSON; `Authorization: Bearer <jwt>`)
+## HTTP API (JSON · `Authorization: Bearer <jwt>`)
 
 | method | path | auth | notes |
 |---|---|---|---|
-| POST | /api/auth/register · /login | – | `{ token, user }` |
-| GET · PATCH | /api/auth/me | any | PATCH `{ name?, password? }` |
-| GET | /api/queues | optional | `?q=&category=&open=1` — list with live counts |
-| GET | /api/queues/nearby | optional | `?lat&lng&radius(km, default 5)&q&category` — MongoDB `$geoNear`, sorted by distance, adds `distanceKm` |
-| POST | /api/queues | staff/admin | `{ name, category?, description?, avgServiceMinutes? }` |
-| GET | /api/queues/:id | optional | `QueueState` (names only for owner/admin) |
-| PATCH | /api/queues/:id | owner/admin | any of name, description, avgServiceMinutes, isOpen, category, phone, email, image, address{}, hours{}, services[], location{lat,lng} |
-| POST | /api/queues/:id/join | any | `{ service? }` → `{ ticket }` |
-| POST | /api/queues/:id/next · /skip · /complete | owner/admin | `QueueState` |
-| GET | /api/queues/:id/stats | owner/admin | today's totals, avg wait, per-hour |
-| GET | /api/tokens/mine · /history · /:id | any | tickets |
-| DELETE | /api/tokens/:id | owner | leave |
-| GET · POST · PATCH | /api/appointments | any | `{ queue, at, service?, note? }`, PATCH `{ status }` |
-| GET | /api/admin/stats · /users | admin | platform stats (7-day series, recent activity, busiest shops) |
-| PATCH | /api/admin/users/:id | admin | `{ role }` |
+| POST | `/api/auth/register` · `/login` | – | `{ token, user }` |
+| GET · PATCH | `/api/auth/me` | any | PATCH `{ name?, password? }` |
+| GET | `/api/queues` | optional | `?q&category&open=1` approved shops · `?mine=1` your own (any status) · `?all=1` everything (admin) |
+| GET | `/api/queues/nearby` | optional | `?lat&lng&radius(km ≤100)&q&category` — `$geoNear`, adds `distanceKm`, max 100 results |
+| POST | `/api/queues` | staff/admin | starts `pending` unless admin or `AUTO_APPROVE_SHOPS=1` |
+| GET | `/api/queues/:id` | optional | `QueueState`; unapproved shops only for owner/admin |
+| PATCH | `/api/queues/:id` | owner/admin | profile fields, `counters`, `graceMinutes`, `services[]`, `location{lat,lng}` |
+| POST | `/api/queues/:id/join` | any | `{ service? }` → `{ ticket }` |
+| POST | `/api/queues/:id/next` · `/skip` · `/complete` | owner/admin | `{ counter? }` (default 1) |
+| POST | `/api/queues/:id/arrived/:tokenId` · `/recall/:tokenId` | owner/admin | check in · un-skip |
+| GET | `/api/queues/:id/stats` | owner/admin | `?days=1|7|30` — totals, avg wait, per-hour, per-day, weekday×hour heatmap |
+| GET | `/api/tokens/mine` · `/history` · `/:id` | any | tickets |
+| DELETE | `/api/tokens/:id` | owner | leave |
+| GET · POST · PATCH | `/api/appointments` | any | `{ queue, at, service?, note? }` · PATCH `{ status }` |
+| GET | `/api/push/key` | – | `{ publicKey, enabled }` |
+| POST · DELETE | `/api/push/subscribe` | any | register / remove this device |
+| GET | `/api/admin/stats` · `/users` | admin | platform stats, users |
+| PATCH | `/api/admin/users/:id` | admin | `{ role }` |
+| PATCH | `/api/admin/shops/:id` | admin | `{ status: approved|suspended|pending }` |
 
 `/api/shops/*` is an alias of `/api/queues/*`.
 
-`QueueSummary` adds `category, image, phone, email, address, hours, services, location {lat,lng}, etaMinutes, distanceKm?` to the original fields. `Ticket` adds `service, waitingNumbers, queue.category/address/location`.
-
 ## Socket.IO
 
-Guests may connect without a token (to watch public queues); a bad token is rejected. `queue:watch`/`queue:unwatch` (queueId) join/leave room `queue:<id>`. After every mutation the server emits `queue:update` `{ queueId, name, isOpen, avgServiceMinutes, currentNumber, waitingNumbers }` to the room and `ticket:update` (full `Ticket`) to each affected user. The client derives in-app notifications (approaching / next / your turn / completed / skipped) from `ticket:update`, shows toasts, and uses the browser Notification API when permitted.
+Guests may connect without a token. `queue:watch` / `queue:unwatch` (queueId) join and leave room `queue:<id>`. After every mutation the server emits `queue:update` `{ queueId, name, isOpen, avgServiceMinutes, currentNumber, serving[{number, counter}], waitingNumbers, etaMinutes }` to the room and `ticket:update` (full `Ticket`) to each affected user, then sends a web push for the moments that matter (approaching, next, your turn, done, skipped) — each once per token.
 
 ## Layout
 
 ```
-server/src   app.js (express + socket)  db.js (mongo / embedded)  index.js  auth.js  models.js  queue.js
-             routes/ auth queues tokens appointments admin        seed.js   test/queue.test.js
-client/src   App.jsx (routes, lazy chunks)  api.js  auth.jsx
-             styles/  base.css (tokens, dark mode, utilities)  ui.css (components)  pages.css
-             ui/      index.jsx (Button, Input, Badge, Card, StatCard, Tabs, Skeleton, EmptyState…)  Modal.jsx (Modal, Sheet, Drawer)  Toast.jsx
-             lib/     hooks.js (useFetch, useQueueWatch, useTicketUpdates)  geo.js  maps.js  theme.jsx  notifications.jsx  format.js
-             components/ Layout (Navbar, BottomNav, DashboardLayout)  Map (GoogleMap + fallback)  LocationPicker  LocationPrompt
-                         Cards (ShopCard, TokenCard, QueueTimeline, AppointmentCard, NotificationCard, ServiceCard)  JoinQueue  BookAppointment  SearchPalette  Chart
-             pages/   Landing Login Nearby Shop  user/(Home Ticket Appointments Notifications Profile)
-                      vendor/(VendorContext Overview LiveQueue Appointments ShopProfile Location Services Analytics Settings)  admin/(Dashboard Lists)
+server/  src/app.js (express + socket)  db.js  index.js  auth.js  models.js  queue.js  push.js
+         src/routes/ auth queues tokens appointments admin push
+         seed.js  demo.js  vapid.js  test/queue.test.js
+client/  src/App.jsx  api.js  auth.jsx  public/sw.js (push service worker)
+         lib/  hooks geo motion gsap push notifications theme format maps osm
+         ui/   index.jsx (primitives, Reveal, Logo)  Modal.jsx  Toast.jsx
+         components/  Layout Map LocationPicker LocationPrompt Cards Chart QrCode CursorGlow JoinQueue BookAppointment SearchPalette
+         pages/  Landing Login Nearby Shop  user/(Home Ticket Appointments Notifications Profile)
+                 vendor/(VendorContext Overview LiveQueue Appointments ShopProfile Location Services Analytics Settings)
+                 admin/(Dashboard Lists)
+Dockerfile  docker-compose.yml  DEMO.md
 ```
+
+## Stack
+
+**Server** — Node 20+, Express 5, Mongoose 8, Socket.IO 4, JWT, bcryptjs, web-push. ESM, `node --env-file`. Embedded MongoDB (`mongodb-memory-server`, dev only) or any `MONGO_URI`.
+**Client** — Vite, React 18, react-router 6, Framer Motion (+ GSAP ScrollTrigger, lazy-loaded, for scroll scrub only), Leaflet/OpenStreetMap or Google Maps, plain CSS with light and dark themes.
