@@ -114,6 +114,27 @@ async function upsertUser(name, email, role) {
   return (await User.findOne({ email })) || User.create({ name, email, role, passwordHash: await bcrypt.hash(PASSWORD, 10) });
 }
 
+// Paid express slots: two of today's served tokens plus a 60-day history, so the sales pages have something to show.
+async function expressHistory(queue, s, i, people) {
+  const now = Date.now();
+  const [price, perHour] = s.express;
+  const paid = (n) => ({ orderId: `order_seed_${n.toString(36)}`, paymentId: `pay_seed_${n.toString(36)}`, amount: price * 100 });
+  const todays = await Token.find({ queue: queue._id, status: 'served', 'express.paymentId': { $exists: false } }).sort('createdAt').limit(2);
+  await Promise.all(todays.map((t, k) => Token.updateOne({ _id: t._id }, { express: paid(i * 1000 + k), priority: true })));
+  const history = [];
+  for (let d = 1; d <= 60; d++) {
+    const dayStart = new Date(new Date(now - d * 86400000).toISOString().slice(0, 10));
+    // closed Sundays; otherwise 0..perHour*3 a day, drifting upward towards today so the trend reads as growth
+    const n = dayStart.getUTCDay() === 0 ? 0 : Math.round((((d * 7 + i) % (perHour * 3)) + (d % 3 === 0 ? 1 : 0)) * (1.3 - d / 100));
+    for (let k = 0; k < n; k++) {
+      const createdAt = new Date(dayStart.getTime() + (10 + ((k * 5 + d) % 8)) * 3600000 + ((k * 17 + d * 3) % 60) * 60000);
+      const calledAt = new Date(createdAt.getTime() + 4 * 60000);
+      history.push({ queue: queue._id, user: people[(k * 3 + d + i) % people.length]._id, number: k + 1, service: queue.services[(k + d) % queue.services.length].name, status: 'served', priority: true, express: paid(i * 1000 + d * 10 + k + 100), pushed: [], calledAt, doneAt: new Date(calledAt.getTime() + s.avg * 60000), createdAt, updatedAt: createdAt });
+    }
+  }
+  if (history.length) await Token.collection.insertMany(history);
+}
+
 export async function seed() {
   const admin = await upsertUser('Admin', process.env.ADMIN_EMAIL || 'admin@example.com', 'admin');
   const customer = await upsertUser('Aarav Customer', 'user@example.com', 'user');
@@ -121,7 +142,11 @@ export async function seed() {
   const day = new Date().toISOString().slice(0, 10);
   const created = [];
   for (const [i, s] of [...SHOPS, ...extraShops()].entries()) {
-    if (await Queue.exists({ name: s.name })) continue;
+    const existing = await Queue.findOne({ name: s.name });
+    if (existing) {
+      if (s.express && !(await Token.exists({ queue: existing._id, 'express.paymentId': { $exists: true } }))) await expressHistory(existing, s, i, people);
+      continue;
+    }
     const vendor = await upsertUser(`${s.name} Owner`, `${slug(s.name)}@example.com`, 'staff');
     const queue = await Queue.create({
       name: s.name, description: s.description, category: s.category, owner: vendor._id, avgServiceMinutes: s.avg, image: s.image,
@@ -142,6 +167,7 @@ export async function seed() {
       const t = await Token.create({ queue: queue._id, user: people[(k * 7 + i) % people.length]._id, number: ++counter, service: queue.services[k % queue.services.length].name, status: k % 9 === 8 ? 'skipped' : 'served', calledAt, doneAt: new Date(calledAt.getTime() + s.avg * 60000) });
       await Token.collection.updateOne({ _id: t._id }, { $set: { createdAt } }); // .collection: Mongoose strips createdAt from $set
     }
+    if (s.express) await expressHistory(queue, s, i, people);
     // one customer at each counter, the rest waiting
     for (let k = 0; k < s.queue; k++) {
       const atCounter = k < queue.counters;

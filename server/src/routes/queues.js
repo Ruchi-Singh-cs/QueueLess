@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { Queue, Token, ExpressOrder, CATEGORIES } from '../models.js';
 import { paymentsEnabled, publicKeyId, createOrder, verifyPayment } from '../payments.js';
+import { sales } from '../sales.js';
 import { authRequired, authOptional, requireRole, fail, field, shape, owns } from '../auth.js';
 import { approved, joinQueue, callNext, markArrived, recallToken, releaseStranded, ticketFor, queueState, queueStats, summary, broadcastQueue, ACTIVE, expressSlotsLeft } from '../queue.js';
 
@@ -80,6 +81,13 @@ r.get('/:id/stats', authRequired, async (req, res) => {
   const queue = await getQueue(req, true);
   const days = [1, 7, 30].includes(Number(req.query.days)) ? Number(req.query.days) : 1;
   res.json(await queueStats(queue._id, days));
+});
+
+// Express-slot sales history for the owner (or an admin)
+r.get('/:id/sales', authRequired, async (req, res) => {
+  const queue = await getQueue(req, true);
+  const days = [7, 30, 90].includes(Number(req.query.days)) ? Number(req.query.days) : 30;
+  res.json(await sales({ queue: queue._id }, days));
 });
 
 r.patch('/:id', authRequired, async (req, res) => {

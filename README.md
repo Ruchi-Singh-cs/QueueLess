@@ -98,9 +98,9 @@ Push notifications need `localhost` or HTTPS (a browser rule for service workers
 
 **Customer** — map of nearby shops with live wait times, location accuracy shown honestly with a map pin to correct it; join a queue with a service; live ticket with position, ETA, which counter to go to and an arrive-by countdown; push notifications that reach a closed tab; appointments that check in as priority tokens; history.
 
-**Vendor** — one tile per counter with Next / Skip / Complete, Arrived check-in, grace-period auto-skip of no-shows, one-tap Recall; keyboard-driven (`N` `S` `C`, `1`–`n` picks the counter); shop profile, map pin, services with durations, hours; printable counter QR; analytics for today / 7 / 30 days with a weekday×hour heatmap; **express slots** — sell a capped number of front-of-line tokens per hour through Razorpay (never for government offices).
+**Vendor** — one tile per counter with Next / Skip / Complete, Arrived check-in, grace-period auto-skip of no-shows, one-tap Recall; keyboard-driven (`N` `S` `C`, `1`–`n` picks the counter); shop profile, map pin, services with durations, hours; printable counter QR; analytics for today / 7 / 30 days with a weekday×hour heatmap; **express slots** — sell a capped number of front-of-line tokens per hour through Razorpay (never for government offices); **Sales** page — revenue, slots sold, paying customers, trend, revenue-by-day chart and every payment.
 
-**Admin** — approve, suspend or restore businesses (new ones are hidden until approved); users and roles; platform stats.
+**Admin** — approve, suspend or restore businesses (new ones are hidden until approved); users and roles; platform stats; **Transactions** — every express payment across the platform with per-shop breakdown.
 
 ## Roles & routes
 
@@ -156,12 +156,14 @@ PushSubscription { user, endpoint (unique), keys{p256dh, auth}, userAgent }
 | POST | `/api/queues/:id/next` · `/skip` · `/complete` | owner/admin | `{ counter? }` (default 1) |
 | POST | `/api/queues/:id/arrived/:tokenId` · `/recall/:tokenId` | owner/admin | check in · un-skip |
 | GET | `/api/queues/:id/stats` | owner/admin | `?days=1|7|30` — totals, avg wait, per-hour, per-day, weekday×hour heatmap |
+| GET | `/api/queues/:id/sales` | owner/admin | `?days=7|30|90` — express revenue, count, paying customers, per-day, transactions |
 | GET | `/api/tokens/mine` · `/history` · `/:id` | any | tickets |
 | DELETE | `/api/tokens/:id` | owner | leave |
 | GET · POST · PATCH | `/api/appointments` | any | `{ queue, at, service?, note? }` · PATCH `{ status }` |
 | GET | `/api/push/key` | – | `{ publicKey, enabled }` |
 | POST · DELETE | `/api/push/subscribe` | any | register / remove this device |
 | GET | `/api/admin/stats` · `/users` | admin | platform stats, users |
+| GET | `/api/admin/transactions` | admin | `?days=7|30|90` — platform-wide express sales, per-shop breakdown |
 | PATCH | `/api/admin/users/:id` | admin | `{ role }` |
 | PATCH | `/api/admin/shops/:id` | admin | `{ status: approved|suspended|pending }` |
 
@@ -174,7 +176,7 @@ Guests may connect without a token. `queue:watch` / `queue:unwatch` (queueId) jo
 ## Layout
 
 ```
-server/  src/app.js (express + socket)  db.js  index.js  auth.js  models.js  queue.js  push.js
+server/  src/app.js (express + socket)  db.js  index.js  auth.js  models.js  queue.js  sales.js  payments.js  push.js
          src/routes/ auth queues tokens appointments admin push
          scripts/ seed vapid    test/queue.test.js
 client/  src/App.jsx  api.js  auth.jsx  public/sw.js (push service worker)

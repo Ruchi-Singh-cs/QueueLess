@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
-import { Menu, X, Sun, Moon, Bell, LogOut, User, Search, Home, MapPin, Ticket, CalendarDays, LayoutDashboard, ListOrdered, Store, Wrench, BarChart3, Settings, Users, Building2, PanelLeftClose, PanelLeftOpen, ChevronDown, Zap } from 'lucide-react'
+import { Menu, X, Sun, Moon, Bell, LogOut, User, Search, Home, MapPin, Ticket, CalendarDays, LayoutDashboard, ListOrdered, Store, Wrench, BarChart3, Settings, Users, Building2, PanelLeftClose, PanelLeftOpen, ChevronDown, Zap, IndianRupee } from 'lucide-react'
 import { useAuth } from '../auth.jsx'
 import { useTheme } from '../lib/theme.jsx'
 import { useNotifications } from '../lib/notifications.jsx'
@@ -194,6 +194,7 @@ export const VENDOR_NAV = [
   { to: '/vendor/location', label: 'Location', icon: MapPin },
   { to: '/vendor/services', label: 'Services', icon: Wrench },
   { to: '/vendor/analytics', label: 'Analytics', icon: BarChart3 },
+  { to: '/vendor/sales', label: 'Sales', icon: IndianRupee },
   { to: '/vendor/settings', label: 'Settings', icon: Settings },
 ]
 export const ADMIN_NAV = [
@@ -204,6 +205,7 @@ export const ADMIN_NAV = [
   { to: '/admin/queues', label: 'Queues', icon: ListOrdered },
   { to: '/admin/appointments', label: 'Appointments', icon: CalendarDays },
   { to: '/admin/analytics', label: 'Analytics', icon: BarChart3 },
+  { to: '/admin/transactions', label: 'Transactions', icon: IndianRupee },
   { to: '/admin/settings', label: 'Settings', icon: Settings },
 ]
 

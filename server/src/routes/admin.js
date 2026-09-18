@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { User, Queue, Token, Appointment, SHOP_STATUS } from '../models.js';
 import { authRequired, requireRole, fail } from '../auth.js';
 import { startOfToday } from '../queue.js';
+import { sales } from '../sales.js';
 
 const r = Router();
 r.use(authRequired, requireRole('admin'));
@@ -47,6 +48,12 @@ r.get('/stats', async (req, res) => {
     shops: busiest.map((q) => ({ _id: q._id, name: q.name, category: q.category, status: q.status || 'approved', isOpen: q.isOpen, currentNumber: q.currentToken?.number ?? null, waitingCount: waitingBy[String(q._id)] || 0 }))
       .sort((a, b) => b.waitingCount - a.waitingCount),
   });
+});
+
+// Platform-wide express-slot payments
+r.get('/transactions', async (req, res) => {
+  const days = [7, 30, 90].includes(Number(req.query.days)) ? Number(req.query.days) : 30;
+  res.json(await sales({}, days));
 });
 
 r.get('/users', async (req, res) => {

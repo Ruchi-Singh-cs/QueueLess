@@ -29,6 +29,7 @@ const VLocation = lazy(() => import('./pages/vendor/Location.jsx'))
 const VServices = lazy(() => import('./pages/vendor/Services.jsx'))
 const VAnalytics = lazy(() => import('./pages/vendor/Analytics.jsx'))
 const VSettings = lazy(() => import('./pages/vendor/Settings.jsx'))
+const VSales = lazy(() => import('./pages/vendor/Sales.jsx'))
 const ADashboard = lazy(() => import('./pages/admin/Dashboard.jsx'))
 const AShops = lazy(() => import('./pages/admin/Lists.jsx').then((m) => ({ default: m.Shops })))
 const AUsers = lazy(() => import('./pages/admin/Lists.jsx').then((m) => ({ default: m.UsersPage })))
@@ -37,6 +38,7 @@ const AQueues = lazy(() => import('./pages/admin/Lists.jsx').then((m) => ({ defa
 const AAppointments = lazy(() => import('./pages/admin/Lists.jsx').then((m) => ({ default: m.AdminAppointments })))
 const AAnalytics = lazy(() => import('./pages/admin/Lists.jsx').then((m) => ({ default: m.AdminAnalytics })))
 const ASettings = lazy(() => import('./pages/admin/Lists.jsx').then((m) => ({ default: m.AdminSettings })))
+const ATransactions = lazy(() => import('./pages/admin/Transactions.jsx'))
 
 const Fallback = () => <div className="container page"><Skeleton h={36} w={260} /><Skeleton h={220} r={16} className="mt-5" /></div>
 
@@ -92,6 +94,7 @@ export default function App() {
                       <Route path="location" element={<VLocation />} />
                       <Route path="services" element={<VServices />} />
                       <Route path="analytics" element={<VAnalytics />} />
+                      <Route path="sales" element={<VSales />} />
                       <Route path="settings" element={<VSettings />} />
                     </Route>
                   </Route>
@@ -104,6 +107,7 @@ export default function App() {
                     <Route path="queues" element={<AQueues />} />
                     <Route path="appointments" element={<AAppointments />} />
                     <Route path="analytics" element={<AAnalytics />} />
+                    <Route path="transactions" element={<ATransactions />} />
                     <Route path="settings" element={<ASettings />} />
                   </Route>
 

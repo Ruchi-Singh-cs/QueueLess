@@ -332,6 +332,17 @@ test('queue flow over HTTP', async () => {
   r = await api('PATCH', `/api/queues/${r.body.queue._id}`, { token: staff2, body: { express: { enabled: true, price: 100 } } });
   assert.equal(r.status, 400);
   await api('PATCH', `/api/queues/${qid}`, { token: staff, body: { express: { enabled: false } } });
+  // sales history: the paid token above is the only transaction, visible to the owner and platform-wide to the admin
+  r = await api('GET', `/api/queues/${qid}/sales`, { token: staff });
+  assert.equal(r.status, 200);
+  assert.deepEqual([r.body.count, r.body.amount, r.body.customers, r.body.byDay.length, r.body.transactions[0].paymentId], [1, 19900, 1, 30, 'pay_x']);
+  assert.equal(r.body.byDay.reduce((n, d) => n + d.count, 0), 1);
+  r = await api('GET', `/api/queues/${qid}/sales`, { token: user1 });
+  assert.equal(r.status, 403);
+  r = await api('GET', '/api/admin/transactions?days=7', { token: admin });
+  assert.deepEqual([r.body.count, r.body.byDay.length, r.body.byShop[0].name, r.body.transactions[0].queue.name], [1, 7, 'Dr. Sharma Clinic', 'Dr. Sharma Clinic']);
+  r = await api('GET', '/api/admin/transactions', { token: staff });
+  assert.equal(r.status, 403);
 
   // stats ranges
   r = await api('GET', `/api/queues/${qid}/stats?days=7`, { token: staff });
