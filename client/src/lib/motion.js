@@ -1,13 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useMotionValue, useReducedMotion, useSpring } from 'framer-motion'
 
-/**
- * One motion vocabulary for the whole app, so nothing feels hand-tuned in isolation.
- *
- * EASE is a long, decelerating curve — things arrive quickly and settle softly, the house style at
- * Apple and Linear. EASE_UI is shorter and symmetric, for things that respond to a pointer.
- * Everything here animates transform and opacity only, which the compositor handles without layout.
- */
+// Shared motion vocabulary. EASE: long decelerating entrance. EASE_UI: short, for pointer feedback. Transform/opacity only.
 export const EASE = [0.16, 1, 0.3, 1]
 export const EASE_UI = [0.4, 0, 0.2, 1]
 
@@ -41,11 +35,7 @@ export const page = {
 /** Standard viewport trigger: fire once, slightly before the element is fully on screen. */
 export const inView = { once: true, margin: '-12% 0px -8% 0px' }
 
-/**
- * Pulls an element gently toward the pointer while it is over it. Returns a ref and the
- * motion values to bind. Disabled for reduced motion and for coarse pointers, where there is
- * no hover to respond to and the transform would just fight the tap.
- */
+/** Pulls an element toward the pointer on hover. Off for reduced motion and coarse pointers. */
 export function useMagnetic({ strength = 0.28, radius = 90 } = {}) {
   const ref = useRef(null)
   const reduce = useReducedMotion()

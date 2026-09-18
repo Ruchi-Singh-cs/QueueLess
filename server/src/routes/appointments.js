@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { Appointment, Queue } from '../models.js';
 import { authRequired, fail, field, owns } from '../auth.js';
-import { joinQueue, broadcastQueue } from '../queue.js';
+import { approved, joinQueue, broadcastQueue } from '../queue.js';
 
 const r = Router();
 r.use(authRequired);
@@ -21,6 +21,7 @@ r.get('/', async (req, res) => {
 r.post('/', async (req, res) => {
   const queue = await Queue.findById(field(req, 'queue', 'string'));
   if (!queue) throw fail(404, 'queue not found');
+  if (!approved(queue)) throw fail(403, queue.status === 'suspended' ? 'this business is suspended' : 'this business is awaiting verification');
   const at = new Date(field(req, 'at', 'string'));
   if (!(at > new Date())) throw fail(400, 'at must be a future date');
   const service = field(req, 'service', 'string', true) ?? '';

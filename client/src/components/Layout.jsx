@@ -170,11 +170,7 @@ export function PublicLayout({ footer = true }) {
   )
 }
 
-/**
- * Cross-fades the routed page while the surrounding chrome stays mounted. Pages keep their own
- * PageTransition for the vertical rise; this only handles opacity, so the two compose instead of
- * fighting. mode="wait" means the outgoing page is gone before the next paints.
- */
+/** Cross-fades the routed page while the chrome stays mounted. Opacity only; pages add their own rise. */
 function RouteFade() {
   const { pathname } = useLocation()
   const reduce = useReducedMotion()

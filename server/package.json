@@ -6,13 +6,15 @@
     "dev": "node --watch --env-file=.env src/index.js",
     "start": "node --env-file=.env src/index.js",
     "test": "node --test",
-    "seed": "node --env-file=.env seed.js",
-    "vapid": "node vapid.js",
-    "demo": "node --env-file=.env demo.js"
+    "seed": "node --env-file=.env scripts/seed.js",
+    "demo": "node --env-file=.env scripts/demo.js",
+    "vapid": "node scripts/vapid.js"
   },
   "dependencies": {
     "bcryptjs": "^3",
     "express": "^5",
+    "express-rate-limit": "^8.7.0",
+    "helmet": "^8.3.0",
     "jsonwebtoken": "^9",
     "mongoose": "^8",
     "socket.io": "^4",
@@ -23,5 +25,10 @@
   },
   "allowScripts": {
     "mongodb-memory-server@10.4.3": true
+  },
+  "version": "1.0.0",
+  "description": "QueueLess API: Express, Mongoose, Socket.IO, web push",
+  "engines": {
+    "node": ">=20"
   }
 }

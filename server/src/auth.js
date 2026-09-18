@@ -1,4 +1,5 @@
 import jwt from 'jsonwebtoken';
+import { User } from './models.js';
 
 export const fail = (status, message) => Object.assign(new Error(message), { status });
 
@@ -36,9 +37,18 @@ const bearer = (req) => {
   return scheme === 'Bearer' && token ? token : null;
 };
 
-export function authRequired(req, res, next) {
+// The role comes from the database, not the JWT: an admin's role change takes effect on the next request
+// instead of whenever the 7-day token happens to expire.
+async function resolveUser(token) {
+  const { id } = verifyToken(token);
+  const user = await User.findById(id).select('role');
+  if (!user) throw new Error('unknown user');
+  return { id, role: user.role };
+}
+
+export async function authRequired(req, res, next) {
   try {
-    req.user = verifyToken(bearer(req));
+    req.user = await resolveUser(bearer(req));
     next();
   } catch {
     res.status(401).json({ error: 'unauthorized' });
@@ -46,10 +56,10 @@ export function authRequired(req, res, next) {
 }
 
 // Public routes: attach req.user when a valid token is present, otherwise a guest.
-export function authOptional(req, res, next) {
+export async function authOptional(req, res, next) {
   const token = bearer(req);
   try {
-    req.user = token ? verifyToken(token) : { id: null, role: 'guest' };
+    req.user = token ? await resolveUser(token) : { id: null, role: 'guest' };
   } catch {
     req.user = { id: null, role: 'guest' };
   }

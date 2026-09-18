@@ -1,12 +1,4 @@
-/**
- * GSAP is here for one thing Framer Motion does not do well: scrub — animation welded to scroll
- * position rather than fired when an element appears. Everything that merely enters, hovers or
- * transitions stays on Framer Motion; adding a second library for those would be weight with no
- * capability.
- *
- * It is imported dynamically so it never lands in the initial bundle (Landing is eagerly loaded),
- * and it is never loaded at all for reduced motion or on the server.
- */
+// GSAP is used only for scroll scrub, which Framer Motion cannot do. Loaded lazily; never for reduced motion.
 let pending = null
 
 export function loadGsap() {
@@ -23,12 +15,7 @@ export function loadGsap() {
   return pending
 }
 
-/**
- * Runs `setup({ gsap, ScrollTrigger })` once the library is in, and reverts everything it created
- * on unmount. gsap.context() tracks every tween and trigger made inside it, so cleanup is total —
- * important here, because ScrollTrigger attaches to the document and would otherwise outlive the
- * page across a route change.
- */
+/** Runs setup once GSAP is loaded; the returned cleanup reverts every tween and ScrollTrigger it created. */
 export function withGsap(setup, el) {
   let ctx
   let dead = false

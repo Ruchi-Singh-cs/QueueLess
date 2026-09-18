@@ -2,13 +2,7 @@ import { useEffect } from 'react'
 import { motion, useMotionValue, useReducedMotion, useSpring } from 'framer-motion'
 import { useFinePointer } from '../lib/motion.js'
 
-/**
- * A soft light that trails the pointer, and tightens over anything interactive.
- *
- * Deliberately cheap: one fixed, pointer-events-none layer moved with translate only, driven by
- * springs rather than a per-frame React render, so it never touches layout and never re-renders the
- * tree. Mounted only where there is a real hovering pointer, and never under reduced motion.
- */
+/** Pointer light. One fixed layer moved by springs on motion values — no React re-render, no layout. Fine pointers only. */
 export function CursorGlow() {
   const reduce = useReducedMotion()
   const fine = useFinePointer()

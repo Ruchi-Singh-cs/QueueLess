@@ -36,7 +36,7 @@ r.get('/stats', async (req, res) => {
     perDay(Appointment, 7),
     Token.find().sort('-updatedAt').limit(12).populate('queue', 'name category').populate('user', 'name'),
   ]);
-  const busiest = await Queue.find().populate('currentToken', 'number').limit(50);
+  const busiest = await Queue.find().populate('currentToken', 'number');
   const waiting = await Token.aggregate([{ $match: { status: 'waiting' } }, { $group: { _id: '$queue', count: { $sum: 1 } } }]);
   const waitingBy = Object.fromEntries(waiting.map((w) => [String(w._id), w.count]));
   const pendingShops = await Queue.countDocuments({ status: 'pending' });

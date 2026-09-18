@@ -6,6 +6,7 @@ export default defineConfig({
   server: {
     host: true, // listen on IPv4 + IPv6 + LAN (so localhost, 127.0.0.1 and your phone on Wi-Fi all work)
     port: 5173,
+    allowedHosts: ['.ngrok-free.app', '.ngrok-free.dev', '.ngrok.app', '.ngrok.io'], // tunnels for phone testing (push needs HTTPS)
     proxy: {
       '/api': 'http://127.0.0.1:4000',
       '/socket.io': { target: 'http://127.0.0.1:4000', ws: true },

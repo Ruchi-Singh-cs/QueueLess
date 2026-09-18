@@ -98,7 +98,7 @@ export default function LiveQueue() {
 
   useEffect(() => {
     const onKey = (e) => {
-      if (e.target.closest('input, textarea, select') || e.metaKey || e.ctrlKey) return
+      if (e.repeat || e.target.closest('input, textarea, select') || e.metaKey || e.ctrlKey) return // repeat: holding N must not walk the queue
       const k = e.key.toLowerCase()
       const n = Number(k)
       if (n >= 1 && n <= counters) return setActive(n)

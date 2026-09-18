@@ -10,26 +10,28 @@ const IN_USE = `The local database in server/data is already in use by another p
     - npm run seed / npm run demo is still finishing (wait for it, then start the server).
   To run a second one alongside, point it elsewhere with MONGO_URI.`;
 
+const MISSING = `MONGO_URI is not set. In production the app needs a MongoDB connection string:
+  Render  -> your service -> Environment -> add MONGO_URI (render.yaml marks it sync: false, so it must be set in the dashboard)
+  Docker  -> docker compose sets it for you
+  Atlas   -> Network Access must allow the host's IP (0.0.0.0/0 for cloud hosts)`;
+
 export async function connectDb() {
-  let uri = process.env.MONGO_URI;
+  // pasted values often arrive with a trailing newline or wrapped in quotes; both make mongoose reject the scheme
+  let uri = (process.env.MONGO_URI ?? '').trim().replace(/^['"]|['"]$/g, '');
+  if (!uri && process.env.NODE_ENV === 'production') throw new Error(MISSING);
   let mongo;
   if (!uri) {
-    // ponytail: no MONGO_URI -> embedded mongod persisting to ./data; set MONGO_URI to use a real server
-    // It is a devDependency, so a production install (Docker) does not have it. Say so plainly rather
-    // than dying with ERR_MODULE_NOT_FOUND.
+    // no MONGO_URI -> embedded mongod in ./data. It is a devDependency, absent from production installs.
     let MongoMemoryServer;
     try {
       ({ MongoMemoryServer } = await import('mongodb-memory-server'));
     } catch {
-      throw new Error('MONGO_URI is not set and the embedded database is unavailable in a production install. Set MONGO_URI to a MongoDB connection string (docker compose does this for you).');
+      throw new Error(MISSING);
     }
     const dbPath = fileURLToPath(new URL('../data', import.meta.url));
     mkdirSync(dbPath, { recursive: true });
 
-    // Windows holds an exclusive handle on mongod.lock while a server is running, so opening it for
-    // writing tells us the answer before we spawn anything. Worth doing up front: when the directory
-    // is busy, mongodb-memory-server sometimes dies inside its own stdout parser (a JSON.parse on a
-    // chunk holding two log lines) rather than rejecting, and that throw lands outside any catch here.
+    // Windows holds mongod.lock exclusively while a server runs; check before spawning, because a busy dir can crash mongodb-memory-server outside any catch
     const lockFile = fileURLToPath(new URL('../data/mongod.lock', import.meta.url));
     if (existsSync(lockFile)) {
       try {
@@ -42,18 +44,13 @@ export async function connectDb() {
     try {
       mongo = await MongoMemoryServer.create({ instance: { dbPath, storageEngine: 'wiredTiger' } });
     } catch (err) {
-      // Only one process can hold ./data. Hitting this usually means a server is already running in
-      // another terminal, or `npm run seed`/`npm run demo` is mid-flight. mongod's own message is a
-      // wall of stack trace that says none of that.
-      // belt and braces for platforms where the lock is advisory and the pre-flight check cannot see it
+      // fallback for platforms with advisory locks, where the pre-flight check cannot see the conflict
       if (!/DBPathInUse|lock file/i.test(String(err?.message))) throw err;
       throw new Error(IN_USE);
     }
     uri = mongo.getUri();
   }
-  // The embedded mongod is killed when a short script exits, and WiredTiger only checkpoints
-  // periodically — so the last writes of `npm run seed`/`npm run demo` were being lost. Journaling
-  // every write makes them survive the kill (and replay from ./data on the next start).
+  // journal every write: the embedded mongod is killed when a short script exits, before WiredTiger checkpoints
   const opts = mongo ? { writeConcern: { w: 1, j: true } } : {};
   try {
     await mongoose.connect(uri, opts);

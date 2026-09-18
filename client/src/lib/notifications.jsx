@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { api } from '../api.js'
 import { useAuth } from '../auth.jsx'
 import { useTicketUpdates } from './hooks.js'
 import { useToast } from '../ui/Toast.jsx'
@@ -42,7 +43,9 @@ export function NotificationsProvider({ children }) {
     let loaded = []
     if (key) try { loaded = JSON.parse(localStorage.getItem(key)) || [] } catch {}
     setStore({ key, items: loaded })
-    last.current = new Map()
+    const seen = (last.current = new Map())
+    // seed with the tickets as they stand, or a reload followed by any queue change re-announces "it's your turn"
+    if (key) api('/api/tokens/mine').then((d) => d.tickets.forEach((t) => seen.has(t._id) || seen.set(t._id, t))).catch(() => {})
   }, [key])
   useEffect(() => { if (store.key && store.key === key) try { localStorage.setItem(key, JSON.stringify(store.items.slice(0, 50))) } catch {} }, [store, key])
 
