@@ -1,8 +1,9 @@
-import { createContext, useContext, useState } from 'react'
+import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
 import { readAuth, writeAuth, resetSocket } from './api.js'
 import { unsubscribePush } from './lib/push.js'
 import { roleHome } from './lib/format.js'
+import { useToast } from './ui/Toast.jsx'
 
 const AuthContext = createContext(null)
 
@@ -39,7 +40,21 @@ export const useAuth = () => useContext(AuthContext)
 export function RequireAuth({ roles, children }) {
   const { user } = useAuth()
   const location = useLocation()
+  const toast = useToast()
+  // Bouncing someone to their own home with no explanation reads as a broken page — especially for
+  // a vendor URL opened while signed in as a customer, which is the common way to land here.
+  const wrongRole = !!user && !!roles && !roles.includes(user.role)
+  const warned = useRef(false) // StrictMode runs effects twice in dev; one notice is enough
+  useEffect(() => {
+    if (wrongRole && !warned.current) {
+      warned.current = true
+      toast.info('That page needs a business account.', {
+        description: `You're signed in as ${user.name} (${user.role}). Sign in with a vendor or admin account to open it.`,
+      })
+    }
+  }, [wrongRole, user?.name, user?.role, toast])
+
   if (!user) return <Navigate to="/login" replace state={{ from: location.pathname + location.search }} />
-  if (roles && !roles.includes(user.role)) return <Navigate to={roleHome(user.role)} replace />
+  if (wrongRole) return <Navigate to={roleHome(user.role)} replace />
   return children
 }
