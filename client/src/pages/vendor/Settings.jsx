@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Save, Plus, Store, ExternalLink } from 'lucide-react'
+import { Save, Plus, Store, ExternalLink, Zap } from 'lucide-react'
 import { api } from '../../api.js'
 import { useVendor, Onboarding } from './VendorContext.jsx'
 import { useTheme } from '../../lib/theme.jsx'
@@ -24,7 +24,7 @@ function NumberRow({ name, label, hint, saved, unit, min, max, step = 1, msg, dr
 }
 
 export default function Settings() {
-  const { shop, shops, shopId, setShopId, setState, onCreated } = useVendor()
+  const { shop, shops, shopId, setShopId, setState, onCreated, state } = useVendor()
   const { theme, setTheme } = useTheme()
   const toast = useToast()
   const [draft, setDraft] = useState({})
@@ -41,6 +41,7 @@ export default function Settings() {
     } catch (e) { toast.error(e.message) } finally { setBusy(false) }
   }
   const rowProps = { draft, setDraft, save: patch, busy }
+  const ex = state?.expressConfig || {}
 
   return (
     <PageTransition className="stack gap-5" style={{ maxWidth: 760 }}>
@@ -58,6 +59,18 @@ export default function Settings() {
         <NumberRow name="graceMinutes" label="No-show grace period" hint="How long a called customer has to reach the counter before they're skipped automatically. Set 0 to turn it off and skip by hand."
           saved={shop.graceMinutes || 0} unit="min" min={0} max={60} msg="Grace period updated." {...rowProps} />
       </section>
+      {shop.category !== 'government' && (
+        <section className="card stack gap-4">
+          <div className="row gap-2"><Zap aria-hidden style={{ width: 18, color: 'var(--warning)' }} /><h3>Express slots</h3></div>
+          <p className="small muted">Sell a limited number of front-of-line tokens each hour. Everyone else's wait stays predictable because the cap is visible to them. Paid through Razorpay to you.</p>
+          {!state?.paymentsEnabled && <Alert tone="info">Payments aren't configured on this server yet — set <code>RAZORPAY_KEY_ID</code> and <code>RAZORPAY_KEY_SECRET</code> to offer express slots.</Alert>}
+          <div className="between wrap gap-3"><span className="stack"><b>Offer express slots</b><span className="small muted">Customers see the price and how many are left before they pay.</span></span><Switch checked={!!ex.enabled} onChange={(v) => patch({ express: { enabled: v } }, v ? 'Express slots on.' : 'Express slots off.')} label="Express slots" /></div>
+          <div className="divider" />
+          <NumberRow name="expressPrice" label="Price per slot" hint="Whole rupees. Set this before switching the offer on." saved={ex.price ?? 0} unit="₹" min={0} msg="Price saved." {...rowProps} save={(b, m, c) => patch({ express: { price: Number(b.expressPrice) } }, m, c)} />
+          <div className="divider" />
+          <NumberRow name="expressPerHour" label="Slots per hour" hint="The cap. Two or three keeps the regular queue honest." saved={ex.perHour ?? 2} unit="/ hour" min={1} max={20} msg="Cap saved." {...rowProps} save={(b, m, c) => patch({ express: { perHour: Number(b.expressPerHour) } }, m, c)} />
+        </section>
+      )}
       <section className="card stack gap-4">
         <h3>Workspace</h3>
         {shops.length > 1 && <Field label="Active shop" htmlFor="st-shop"><Select id="st-shop" value={shopId} onChange={(e) => setShopId(e.target.value)}>{shops.map((s) => <option key={s._id} value={s._id}>{s.name}</option>)}</Select></Field>}

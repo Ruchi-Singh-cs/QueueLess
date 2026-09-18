@@ -14,7 +14,7 @@ const img = (id) => `https://images.unsplash.com/${id}?w=1200&q=70&auto=format&f
 // dLat/dLng are offsets from CENTER in degrees (~0.01 ≈ 1.1 km). queue = people in line (first one is being served); served = done earlier today.
 const SHOPS = [
   // --- medical ---
-  { name: 'Dr. Sharma Clinic', category: 'medical', dLat: 0.004, dLng: 0.006, avg: 6, queue: 3, served: 9, grace: 5, street: '12 Mall Road', phone: '+91 98765 11111', image: img('photo-1519494026892-80bbd2d6fd0d'),
+  { name: 'Dr. Sharma Clinic', category: 'medical', dLat: 0.004, dLng: 0.006, avg: 6, queue: 3, served: 9, grace: 5, express: [199, 2], street: '12 Mall Road', phone: '+91 98765 11111', image: img('photo-1519494026892-80bbd2d6fd0d'),
     description: 'Family physician. Walk-ins welcome, appointments preferred.', services: [['General Consultation', 10], ['Follow-up', 6], ['Emergency', 15]] },
   { name: 'Smile Dental Care', category: 'medical', dLat: -0.03, dLng: 0.03, avg: 18, queue: 2, served: 4, street: '7 Swaroop Nagar', phone: '+91 98765 66666', image: img('photo-1606811841689-23dfddce3e95'),
     description: 'Dental check-ups, cleaning and orthodontics.', services: [['Check-up', 15], ['Cleaning', 25], ['Filling', 30]] },
@@ -27,7 +27,7 @@ const SHOPS = [
   { name: 'PetCare Animal Clinic', category: 'medical', dLat: -0.041, dLng: -0.008, avg: 15, queue: 1, served: 3, street: 'Ratanlal Nagar', phone: '+91 98765 12121', image: img('photo-1548767797-d8c844163c4c'),
     description: 'Vet for dogs, cats and birds. Grooming on weekends.', services: [['Vet Consultation', 15], ['Vaccination', 10], ['Grooming', 40]] },
   // --- salon ---
-  { name: 'Glow Salon', category: 'salon', dLat: -0.007, dLng: 0.009, avg: 20, queue: 3, served: 5, street: '4 Civil Lines', phone: '+91 98765 22222', image: img('photo-1560066984-138dadb4c035'),
+  { name: 'Glow Salon', category: 'salon', dLat: -0.007, dLng: 0.009, avg: 20, queue: 3, served: 5, express: [149, 3], street: '4 Civil Lines', phone: '+91 98765 22222', image: img('photo-1560066984-138dadb4c035'),
     description: 'Unisex salon — cuts, colour, styling.', services: [['Haircut', 25], ['Beard Trim', 15], ['Hair Colour', 60]] },
   { name: 'Urban Cuts Barbershop', category: 'salon', dLat: 0.016, dLng: 0.028, avg: 15, queue: 6, served: 14, street: 'Tilak Nagar Market', phone: '+91 98765 23232', image: img('photo-1503951914875-452162b0f3f1'), hours: ['08:00', '21:00'],
     description: 'Classic barbershop. Fades, shaves and hot towels.', services: [['Haircut', 15], ['Shave', 10], ['Head Massage', 15]] },
@@ -127,6 +127,7 @@ export async function seed() {
       name: s.name, description: s.description, category: s.category, owner: vendor._id, avgServiceMinutes: s.avg, image: s.image,
       isOpen: s.open !== false, status: 'approved', phone: s.phone, email: vendor.email,
       counters: s.counters ?? (s.category === 'bank' || s.category === 'government' ? 3 : 1), graceMinutes: s.grace ?? 0,
+      ...(s.express && { express: { enabled: true, price: s.express[0], perHour: s.express[1] } }),
       address: { street: s.street, city: CITY.city, state: CITY.state, pincode: String(CITY.pin + (i % 25)) },
       hours: { open: s.hours?.[0] ?? '09:00', close: s.hours?.[1] ?? '19:00' },
       services: s.services.map(([name, minutes]) => ({ name, minutes })),

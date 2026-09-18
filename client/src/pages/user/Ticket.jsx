@@ -96,7 +96,7 @@ export default function Ticket() {
       <div className="ticket-head">
         <div className="row gap-3" style={{ minWidth: 0 }}>
           <span className={cx('icon-box', ticket.queue.category)}><cat.icon aria-hidden /></span>
-          <div style={{ minWidth: 0 }}><Link to={`/shop/${ticket.queue._id}`} className="ticket-shop truncate">{ticket.queue.name}</Link><div className="small muted">{ticket.service || cat.label}{ticket.priority && <> · <Badge tone="priority">Priority</Badge></>}</div></div>
+          <div style={{ minWidth: 0 }}><Link to={`/shop/${ticket.queue._id}`} className="ticket-shop truncate">{ticket.queue.name}</Link><div className="small muted">{ticket.service || cat.label}{ticket.priority && <> · <Badge tone="priority">{ticket.express ? 'Express' : 'Priority'}</Badge></>}</div></div>
         </div>
         {done ? <Badge tone={ticket.status}>{ticket.status}</Badge> : <Badge tone={serving ? 'success' : 'open'} size="lg"><LiveDot />{serving ? 'Your turn' : 'LIVE'}</Badge>}
       </div>

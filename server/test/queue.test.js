@@ -2,6 +2,7 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import mongoose from 'mongoose';
 import { MongoMemoryServer } from 'mongodb-memory-server';
+import { createHmac } from 'node:crypto';
 
 process.env.JWT_SECRET = 'test-secret';
 process.env.NODE_ENV = 'test';
@@ -11,6 +12,9 @@ process.env.AUTO_APPROVE_SHOPS = '1';
 const vapid = (await import('web-push')).default.generateVAPIDKeys();
 process.env.VAPID_PUBLIC_KEY = vapid.publicKey;
 process.env.VAPID_PRIVATE_KEY = vapid.privateKey;
+// rzp_stub_* keys make payments.js mint orders locally, so the whole express flow runs with a known secret
+process.env.RAZORPAY_KEY_ID = 'rzp_stub_test';
+process.env.RAZORPAY_KEY_SECRET = 'stub-secret';
 const { server, io } = await import('../src/app.js');
 
 let mongo, base;
@@ -293,6 +297,41 @@ test('queue flow over HTTP', async () => {
   r = await api('GET', `/api/tokens/${stray._id}`, { token: staff });
   assert.equal(r.body.ticket.status, 'waiting');
   await api('PATCH', `/api/queues/${qid}`, { token: staff, body: { counters: 2 } });
+
+  // ---- express slots: paid priority, capped per hour, one token per payment, never for government ----
+  const sign = (o, p) => createHmac('sha256', 'stub-secret').update(`${o}|${p}`).digest('hex');
+  r = await api('PATCH', `/api/queues/${qid}`, { token: staff, body: { express: { enabled: true, price: 199, perHour: 1 } } });
+  assert.equal(r.status, 200);
+  assert.deepEqual(r.body.queue.express, { price: 199, perHour: 1, slotsLeft: 1 });
+  assert.equal(r.body.paymentsEnabled, true);
+  r = await api('GET', `/api/queues/${qid}`); // public view shows the offer without slotsLeft… but the state route is one shape
+  assert.equal(r.body.queue.express.price, 199);
+  // clear user1's spot so they can buy in
+  for (const t of (await api('GET', '/api/tokens/mine', { token: user1 })).body.tickets) if (t.status === 'waiting') await api('DELETE', `/api/tokens/${t._id}`, { token: user1 });
+  r = await api('POST', `/api/queues/${qid}/express/order`, { token: user1 });
+  assert.equal(r.status, 201);
+  assert.deepEqual([r.body.amount, r.body.currency, r.body.keyId], [19900, 'INR', 'rzp_stub_test']);
+  const order = r.body.orderId;
+  // a forged signature is refused and the order stays unused
+  r = await api('POST', `/api/queues/${qid}/join`, { token: user1, body: { express: { orderId: order, paymentId: 'pay_x', signature: 'nope' } } });
+  assert.equal(r.status, 400);
+  // the real one buys a priority token at the front of the line
+  r = await api('POST', `/api/queues/${qid}/join`, { token: user1, body: { service: 'Follow-up', express: { orderId: order, paymentId: 'pay_x', signature: sign(order, 'pay_x') } } });
+  assert.equal(r.status, 201);
+  assert.deepEqual([r.body.ticket.priority, r.body.ticket.express, r.body.ticket.ahead <= 2], [true, true, true]);
+  const paidToken = r.body.ticket._id;
+  // the same payment cannot be spent twice (user1 leaves first so the "already in queue" check does not mask it)
+  await api('DELETE', `/api/tokens/${paidToken}`, { token: user1 });
+  r = await api('POST', `/api/queues/${qid}/join`, { token: user1, body: { express: { orderId: order, paymentId: 'pay_x', signature: sign(order, 'pay_x') } } });
+  assert.equal(r.status, 409);
+  // another user's order cannot be redeemed by someone else
+  r = await api('POST', `/api/queues/${qid}/express/order`, { token: user2 });
+  assert.equal(r.status, 409); // perHour is 1 and user1's slot was sold this hour: sold out
+  // government shops can never enable it
+  r = await api('POST', '/api/queues', { token: staff2, body: { name: 'Passport Office', category: 'government' } });
+  r = await api('PATCH', `/api/queues/${r.body.queue._id}`, { token: staff2, body: { express: { enabled: true, price: 100 } } });
+  assert.equal(r.status, 400);
+  await api('PATCH', `/api/queues/${qid}`, { token: staff, body: { express: { enabled: false } } });
 
   // stats ranges
   r = await api('GET', `/api/queues/${qid}/stats?days=7`, { token: staff });

@@ -1,7 +1,8 @@
 import { Router } from 'express';
-import { Queue, Token, CATEGORIES } from '../models.js';
+import { Queue, Token, ExpressOrder, CATEGORIES } from '../models.js';
+import { paymentsEnabled, publicKeyId, createOrder, verifyPayment } from '../payments.js';
 import { authRequired, authOptional, requireRole, fail, field, shape, owns } from '../auth.js';
-import { approved, joinQueue, callNext, markArrived, recallToken, releaseStranded, ticketFor, queueState, queueStats, summary, broadcastQueue } from '../queue.js';
+import { approved, joinQueue, callNext, markArrived, recallToken, releaseStranded, ticketFor, queueState, queueStats, summary, broadcastQueue, ACTIVE, expressSlotsLeft } from '../queue.js';
 
 const r = Router();
 
@@ -102,6 +103,16 @@ r.patch('/:id', authRequired, async (req, res) => {
       return { name: s.name.trim(), minutes: Number.isFinite(s.minutes) && s.minutes >= 0 ? s.minutes : 5 };
     });
   }
+  const express = shape(req, 'express', { enabled: 'boolean', price: 'number', perHour: 'number' });
+  if (express) {
+    if (express.enabled && !paymentsEnabled) throw fail(400, 'payments are not configured on this server');
+    if (express.enabled && queue.category === 'government') throw fail(400, 'express slots are not available for government offices');
+    if (express.price !== undefined && (!Number.isInteger(express.price) || express.price < 0)) throw fail(400, 'price must be a whole number of rupees');
+    if (express.perHour !== undefined && (!Number.isInteger(express.perHour) || express.perHour < 1 || express.perHour > 20)) throw fail(400, 'perHour must be 1–20');
+    const next = { ...(queue.express?.toObject?.() ?? queue.express ?? {}), ...express };
+    if (next.enabled && !(next.price > 0)) throw fail(400, 'set a price before enabling express slots');
+    queue.express = next;
+  }
   const location = shape(req, 'location', { lat: 'number', lng: 'number' });
   if (location) {
     if (location.lat === undefined || location.lng === undefined || Math.abs(location.lat) > 90 || Math.abs(location.lng) > 180) throw fail(400, 'location needs lat and lng');
@@ -114,11 +125,34 @@ r.patch('/:id', authRequired, async (req, res) => {
   res.json(await queueState(queue, true));
 });
 
+// Express join, step 1: create the Razorpay order the client will pay against.
+r.post('/:id/express/order', authRequired, async (req, res) => {
+  const queue = await getQueue(req);
+  if (!paymentsEnabled || !queue.express?.enabled || !(queue.express.price > 0)) throw fail(404, 'express slots are not offered here');
+  if (!approved(queue) || !queue.isOpen) throw fail(400, 'queue is closed');
+  if (await Token.exists({ queue: queue._id, user: req.user.id, status: { $in: ACTIVE } })) throw fail(409, 'already in this queue');
+  if ((await expressSlotsLeft(queue)) < 1) throw fail(409, 'no express slots left this hour');
+  const amount = queue.express.price * 100;
+  const order = await createOrder(amount, `ex_${Date.now()}`, { queue: String(queue._id), user: req.user.id });
+  await ExpressOrder.create({ orderId: order.id, queue: queue._id, user: req.user.id, amount });
+  res.status(201).json({ orderId: order.id, amount, currency: 'INR', keyId: publicKeyId, name: queue.name, description: `Express slot · ${queue.name}` });
+});
+
 r.post('/:id/join', authRequired, async (req, res) => {
   const queue = await getQueue(req);
   const service = field(req, 'service', 'string', true) ?? '';
   if (service && !queue.services.some((s) => s.name === service)) throw fail(400, 'unknown service');
-  const token = await joinQueue(queue, req.user.id, { service });
+  // Express join, step 2: the signed checkout result — verified, matched to an order we created for
+  // this user and shop, and consumed atomically so one payment can never buy two tokens.
+  let express;
+  const pay = shape(req, 'express', { orderId: 'string', paymentId: 'string', signature: 'string' });
+  if (pay) {
+    if (!verifyPayment(pay.orderId, pay.paymentId, pay.signature)) throw fail(400, 'payment could not be verified');
+    const order = await ExpressOrder.findOneAndUpdate({ orderId: pay.orderId, queue: queue._id, user: req.user.id, used: false }, { used: true });
+    if (!order) throw fail(409, 'this payment has already been used or does not belong to this queue');
+    express = { orderId: pay.orderId, paymentId: pay.paymentId, amount: order.amount };
+  }
+  const token = await joinQueue(queue, req.user.id, { service, express });
   await broadcastQueue(req.app.get('io'), queue._id);
   res.status(201).json({ ticket: await ticketFor(token) });
 });

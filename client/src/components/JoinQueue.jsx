@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Users, Clock, Check, ArrowRight, LogIn } from 'lucide-react'
+import { Users, Clock, Check, ArrowRight, LogIn, Zap } from 'lucide-react'
 import { api } from '../api.js'
 import { useAuth } from '../auth.jsx'
 import { fmtMin } from '../lib/format.js'
@@ -10,9 +10,19 @@ import { Modal } from '../ui/Modal.jsx'
 import { ServiceCard } from './Cards.jsx'
 import { useToast } from '../ui/Toast.jsx'
 
+/** Razorpay's hosted checkout, loaded on first use. */
+const loadRazorpay = () => new Promise((resolve, reject) => {
+  if (window.Razorpay) return resolve(window.Razorpay)
+  const s = document.createElement('script')
+  s.src = 'https://checkout.razorpay.com/v1/checkout.js'
+  s.onload = () => resolve(window.Razorpay)
+  s.onerror = () => reject(new Error("Couldn't load the payment window. Check your connection and try again."))
+  document.head.appendChild(s)
+})
+
 /**
  * Join-queue flow: service → review → join → success. Rendered as a modal (bottom sheet on phones).
- * shop: summary with services/currentNumber/waitingCount/etaMinutes
+ * shop: summary with services/currentNumber/waitingCount/etaMinutes, and express {price, perHour, slotsLeft} when offered
  */
 export function JoinQueueModal({ shop, open, onClose, onJoined }) {
   const { user } = useAuth()
@@ -23,18 +33,38 @@ export function JoinQueueModal({ shop, open, onClose, onJoined }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [ticket, setTicket] = useState(null)
+  const [express, setExpress] = useState(false)
   const hasServices = shop.services?.length > 0
+  const offer = shop.express && shop.express.slotsLeft > 0 ? shop.express : null
 
-  useEffect(() => { if (open) { setStep(hasServices ? 0 : 1); setService(null); setError(''); setTicket(null) } }, [open, hasServices])
+  useEffect(() => { if (open) { setStep(hasServices ? 0 : 1); setService(null); setError(''); setTicket(null); setExpress(false) } }, [open, hasServices])
+
+  async function finish(body) {
+    const { ticket } = await api(`/api/queues/${shop._id}/join`, { method: 'POST', body })
+    setTicket(ticket); setStep(2)
+    toast.success(ticket.express ? 'Express slot booked.' : 'Queue joined successfully.', { description: `Your token is #${ticket.number}.` })
+    onJoined?.(ticket)
+    try { if (typeof Notification !== 'undefined' && Notification.permission === 'default') Notification.requestPermission() } catch {}
+  }
 
   async function join() {
     setBusy(true); setError('')
     try {
-      const { ticket } = await api(`/api/queues/${shop._id}/join`, { method: 'POST', body: { service: service?.name || '' } })
-      setTicket(ticket); setStep(2)
-      toast.success('Queue joined successfully.', { description: `Your token is #${ticket.number}.` })
-      onJoined?.(ticket)
-      try { if (typeof Notification !== 'undefined' && Notification.permission === 'default') Notification.requestPermission() } catch {}
+      const body = { service: service?.name || '' }
+      if (!express || !offer) return await finish(body)
+      // express: create the order, pay in Razorpay's window, then join with the signed result
+      const order = await api(`/api/queues/${shop._id}/express/order`, { method: 'POST' })
+      const Razorpay = await loadRazorpay()
+      await new Promise((resolve, reject) => {
+        const rzp = new Razorpay({
+          key: order.keyId, amount: order.amount, currency: order.currency, order_id: order.orderId,
+          name: 'QueueLess', description: order.description, prefill: { name: user.name, email: user.email }, theme: { color: '#2f6bff' },
+          handler: (res) => finish({ ...body, express: { orderId: res.razorpay_order_id, paymentId: res.razorpay_payment_id, signature: res.razorpay_signature } }).then(resolve, reject),
+          modal: { ondismiss: () => reject(new Error('Payment cancelled. Your slot was not charged.')) },
+        })
+        rzp.on('payment.failed', (r) => reject(new Error(r.error?.description || 'Payment failed. You have not been charged.')))
+        rzp.open()
+      })
     } catch (e) { setError(e.message) } finally { setBusy(false) }
   }
 
@@ -65,9 +95,19 @@ export function JoinQueueModal({ shop, open, onClose, onJoined }) {
               <div><span className="eyebrow">Est. wait</span><b className="num">~{fmtMin(shop.etaMinutes)}</b></div>
             </div>
             {service && <div className="between card card-sm"><span className="stack"><span className="xs faint">Service</span><b>{service.name}</b></span>{hasServices && <Button variant="ghost" size="sm" onClick={() => setStep(0)}>Change</Button>}</div>}
+            {offer && (
+              <button type="button" className={cx('express-offer', express && 'on')} onClick={() => setExpress((v) => !v)} aria-pressed={express}>
+                <span className="icon-box"><Zap aria-hidden /></span>
+                <span className="stack grow" style={{ minWidth: 0 }}>
+                  <b>Express slot · ₹{offer.price}</b>
+                  <span className="xs muted">Go to the front of the line. {offer.slotsLeft} of {offer.perHour} left this hour — paid to the shop.</span>
+                </span>
+                <span className={cx('express-check', express && 'on')} aria-hidden><Check strokeWidth={3} /></span>
+              </button>
+            )}
             {error && <Alert tone="error">{error}</Alert>}
             <p className="small muted">You'll get a token instantly. Leave, do your thing, and come back when we tell you your turn is near.</p>
-            <Button variant="primary" size="lg" block loading={busy} onClick={join}>Join Queue</Button>
+            <Button variant="primary" size="lg" block loading={busy} onClick={join}>{express && offer ? `Pay ₹${offer.price} & join` : 'Join Queue'}</Button>
           </motion.div>
         )}
         {step === 2 && ticket && (

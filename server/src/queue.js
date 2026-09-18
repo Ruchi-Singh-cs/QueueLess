@@ -1,6 +1,7 @@
 import { Queue, Token } from './models.js';
 import { fail } from './auth.js';
 import { sendPush } from './push.js';
+import { paymentsEnabled } from './payments.js';
 
 export const ACTIVE = ['waiting', 'serving'];
 /** Shops from before verification existed have no status and count as approved. */
@@ -29,6 +30,7 @@ export const summary = (queue, waiting = []) => ({
   services: queue.services,
   counters: queue.counters || 1,
   graceMinutes: queue.graceMinutes || 0,
+  express: paymentsEnabled && queue.express?.enabled && queue.express.price > 0 ? { price: queue.express.price, perHour: queue.express.perHour } : null,
   location: queue.location?.coordinates ? { lng: queue.location.coordinates[0], lat: queue.location.coordinates[1] } : null,
   isOpen: queue.isOpen,
   avgServiceMinutes: queue.avgServiceMinutes,
@@ -39,7 +41,11 @@ export const summary = (queue, waiting = []) => ({
   ...(queue.distance !== undefined && { distanceKm: Math.round(queue.distance / 100) / 10 }),
 });
 
-export async function joinQueue(queue, userId, { priority = false, service = '' } = {}) {
+/** Express slots left in the current rolling hour. */
+export const expressSlotsLeft = async (queue) =>
+  Math.max(0, (queue.express?.perHour || 0) - await Token.countDocuments({ queue: queue._id, 'express.paymentId': { $exists: true }, createdAt: { $gte: new Date(Date.now() - 3600e3) } }));
+
+export async function joinQueue(queue, userId, { priority = false, service = '', express } = {}) {
   if (queue.status === 'suspended') throw fail(403, 'this business is suspended');
   if (!approved(queue)) throw fail(403, 'this business is awaiting verification');
   if (!queue.isOpen) throw fail(400, 'queue is closed');
@@ -49,7 +55,7 @@ export async function joinQueue(queue, userId, { priority = false, service = '' 
     { _id: queue._id },
     [{ $set: { counterDate: day, counter: { $cond: [{ $eq: ['$counterDate', day] }, { $add: ['$counter', 1] }, 1] } } }],
     { new: true });
-  return Token.create({ queue: queue._id, user: userId, number: bumped.counter, priority, service });
+  return Token.create({ queue: queue._id, user: userId, number: bumped.counter, priority: priority || !!express, service, ...(express && { express }) });
 }
 
 const locks = new Map(); // ponytail: in-process per-queue mutex; use a CAS on queue.currentToken if >1 server process
@@ -148,6 +154,7 @@ export async function ticketFor(token) {
     number: token.number,
     status: token.status,
     priority: token.priority,
+    express: !!token.express?.paymentId,
     service: token.service,
     counter: token.counter ?? null,
     calledAt: token.calledAt ?? null,
@@ -171,13 +178,16 @@ export async function queueState(queue, withNames) {
   const waiting = await Token.find({ queue: queue._id, status: 'waiting' }).sort(ORDER).populate('user', 'name');
   const serving = await Token.find({ queue: queue._id, status: 'serving' }).sort('counter').populate('user', 'name');
   const pub = (t) => ({
-    _id: t._id, number: t.number, priority: t.priority, service: t.service,
+    _id: t._id, number: t.number, priority: t.priority, express: !!t.express?.paymentId, service: t.service,
     ...(withNames && t.user && { user: { _id: t.user._id, name: t.user.name } }),
   });
   const servingPub = (t) => ({ ...pub(t), counter: t.counter ?? 1, calledAt: t.calledAt, arrivedAt: t.arrivedAt ?? null });
   const current = queue.currentToken;
   const state = {
-    queue: summary(queue, waiting),
+    queue: { ...summary(queue, waiting), ...(paymentsEnabled && queue.express?.enabled && { express: { price: queue.express.price, perHour: queue.express.perHour, slotsLeft: await expressSlotsLeft(queue) } }) },
+    paymentsEnabled,
+    // the owner needs the saved config even while the offer is switched off; the public summary hides it then
+    ...(withNames && { expressConfig: { enabled: !!queue.express?.enabled, price: queue.express?.price ?? 0, perHour: queue.express?.perHour ?? 2 } }),
     current: current ? servingPub(current) : null,
     serving: serving.map(servingPub),
     waiting: waiting.map((t) => ({ ...pub(t), createdAt: t.createdAt })),

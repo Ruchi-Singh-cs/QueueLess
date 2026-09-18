@@ -52,7 +52,7 @@ function Counter({ n, token, shop, busy, act, arrived, active, onFocus, tile }) 
 
       <div className="live-who">
         {token
-          ? <><b>{token.user?.name || 'Customer'}</b><span className="muted">{token.service || 'Walk-in'} · called {timeAgo(token.calledAt)}</span>{token.priority && <Badge tone="priority">Priority</Badge>}</>
+          ? <><b>{token.user?.name || 'Customer'}</b><span className="muted">{token.service || 'Walk-in'} · called {timeAgo(token.calledAt)}</span>{token.priority && <Badge tone="priority">{token.express ? 'Express' : 'Priority'}</Badge>}</>
           : <span className="muted">{shop.waitingCount ? 'Press Next to call a customer.' : 'Nobody in the queue right now.'}</span>}
       </div>
 
@@ -147,7 +147,7 @@ export default function LiveQueue() {
                   <motion.li key={t._id} layout initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, x: -20, transition: { duration: 0.15 } }} transition={{ duration: 0.25 }} className={cx('wait-row', i === 0 && 'next')}>
                     <span className="wait-num">#{t.number}</span>
                     <span className="stack grow" style={{ minWidth: 0 }}><b className="truncate">{t.user?.name || 'Customer'}</b><span className="xs muted row gap-2 wait-meta"><span className="truncate">{t.service || 'Walk-in'}</span><span aria-hidden>·</span><Clock aria-hidden style={{ width: 12 }} />{timeAgo(t.createdAt)}</span></span>
-                    {t.priority ? <Badge tone="priority">Priority</Badge> : i === 0 ? <Badge tone="primary">Up next</Badge> : null}
+                    {t.priority ? <Badge tone="priority">{t.express ? 'Express' : 'Priority'}</Badge> : i === 0 ? <Badge tone="primary">Up next</Badge> : null}
                   </motion.li>
                 ))}
               </AnimatePresence>

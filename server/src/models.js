@@ -25,6 +25,8 @@ const queueSchema = new Schema({
   currentToken: { type: Schema.Types.ObjectId, ref: 'Token', default: null }, // most recently called token
   counters: { type: Number, default: 1, min: 1, max: 20, validate: Number.isInteger }, // how many customers can be served at once
   graceMinutes: { type: Number, default: 0, min: 0, max: 60 }, // 0 = off; else a called customer who hasn't arrived is auto-skipped after this
+  // paid priority tokens: a capped number per hour, never for government shops
+  express: { enabled: { type: Boolean, default: false }, price: { type: Number, default: 0, min: 0 }, perHour: { type: Number, default: 2, min: 1, max: 20 } },
   status: { type: String, enum: SHOP_STATUS, default: () => (process.env.AUTO_APPROVE_SHOPS === '1' ? 'approved' : 'pending') },
   category: { type: String, enum: CATEGORIES, default: 'other' },
   phone: { type: String, default: '' },
@@ -54,6 +56,7 @@ const tokenSchema = new Schema({
   arrivedAt: Date, // staff confirmed the customer showed up (stops the grace timer)
   doneAt: Date,
   pushed: { type: [String], default: [] }, // push notification kinds already sent for this token
+  express: { orderId: String, paymentId: String, amount: Number }, // set when the token was bought as an express slot
 }, { timestamps: true });
 tokenSchema.index({ queue: 1, status: 1 });
 tokenSchema.index({ queue: 1, user: 1 }, { unique: true, partialFilterExpression: { status: { $in: ['waiting', 'serving'] } } });
@@ -70,6 +73,15 @@ const appointmentSchema = new Schema({
 }, { timestamps: true });
 appointmentSchema.index({ queue: 1, at: 1 }, { unique: true, partialFilterExpression: { status: 'booked' } });
 export const Appointment = mongoose.model('Appointment', appointmentSchema);
+
+// A Razorpay order we created for an express slot; consumed exactly once by the join that pays for it
+export const ExpressOrder = mongoose.model('ExpressOrder', new Schema({
+  orderId: { type: String, required: true, unique: true },
+  queue: ref('Queue'),
+  user: ref('User'),
+  amount: { type: Number, required: true }, // paise
+  used: { type: Boolean, default: false },
+}, { timestamps: true }));
 
 // Web Push subscriptions (one user may have several devices)
 export const PushSubscription = mongoose.model('PushSubscription', new Schema({

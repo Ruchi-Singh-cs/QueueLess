@@ -428,3 +428,13 @@ button.service-card:hover { border-color: var(--text-3); }
 .card { transition: border-color .2s ease, box-shadow .25s ease, transform .25s cubic-bezier(.2,.8,.2,1); }
 .wait-row { transition: border-color .2s ease, background .2s ease, transform .2s cubic-bezier(.2,.8,.2,1); }
 .wait-row:hover { transform: translateX(2px); }
+
+/* ---------- Express slot offer (join flow) ---------- */
+.express-offer { display: flex; align-items: center; gap: var(--s-3); width: 100%; text-align: left; padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface); cursor: pointer; font: inherit; color: inherit; transition: border-color .2s ease, background .2s ease, box-shadow .25s ease; }
+.express-offer:hover { border-color: var(--border-strong); }
+.express-offer.on { border-color: var(--warning); background: color-mix(in srgb, var(--warning) 8%, var(--surface)); box-shadow: 0 0 0 3px color-mix(in srgb, var(--warning) 18%, transparent); }
+.express-offer .icon-box { width: 36px; height: 36px; color: var(--warning); background: color-mix(in srgb, var(--warning) 14%, transparent); flex: none; }
+.express-check { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--border-strong); display: grid; place-items: center; color: #fff; flex: none; transition: background .2s ease, border-color .2s ease; }
+.express-check svg { width: 13px; height: 13px; opacity: 0; transition: opacity .15s ease; }
+.express-check.on { background: var(--warning); border-color: var(--warning); }
+.express-check.on svg { opacity: 1; }

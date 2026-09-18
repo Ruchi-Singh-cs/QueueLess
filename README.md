@@ -70,6 +70,10 @@ VAPID_PUBLIC_KEY=
 VAPID_PRIVATE_KEY=
 VAPID_SUBJECT=mailto:you@example.com
 
+# Razorpay, for paid express slots. Blank -> feature hidden.
+RAZORPAY_KEY_ID=
+RAZORPAY_KEY_SECRET=
+
 # AUTO_APPROVE_SHOPS=1     # new shops go live without admin approval (default: pending)
 
 # Sample-data city: where npm run seed places the shops
@@ -94,7 +98,7 @@ Push notifications need `localhost` or HTTPS (a browser rule for service workers
 
 **Customer** — map of nearby shops with live wait times, location accuracy shown honestly with a map pin to correct it; join a queue with a service; live ticket with position, ETA, which counter to go to and an arrive-by countdown; push notifications that reach a closed tab; appointments that check in as priority tokens; history.
 
-**Vendor** — one tile per counter with Next / Skip / Complete, Arrived check-in, grace-period auto-skip of no-shows, one-tap Recall; keyboard-driven (`N` `S` `C`, `1`–`n` picks the counter); shop profile, map pin, services with durations, hours; printable counter QR; analytics for today / 7 / 30 days with a weekday×hour heatmap.
+**Vendor** — one tile per counter with Next / Skip / Complete, Arrived check-in, grace-period auto-skip of no-shows, one-tap Recall; keyboard-driven (`N` `S` `C`, `1`–`n` picks the counter); shop profile, map pin, services with durations, hours; printable counter QR; analytics for today / 7 / 30 days with a weekday×hour heatmap; **express slots** — sell a capped number of front-of-line tokens per hour through Razorpay (never for government offices).
 
 **Admin** — approve, suspend or restore businesses (new ones are hidden until approved); users and roles; platform stats.
 
@@ -114,12 +118,14 @@ Opening a route your role can't use redirects to your home and says why.
 ```
 User             { name, email (unique), passwordHash, role: user|staff|admin }
 Queue (= shop)   { name, description, owner→User, category, status: pending|approved|suspended,
+                   express{enabled, price (₹), perHour},
                    avgServiceMinutes, isOpen, counters (1–20), graceMinutes (0 = off),
                    counter, counterDate, currentToken→Token,
                    phone, email, image, address{street,city,state,pincode}, hours{open,close},
                    services[{name, minutes}], location: GeoJSON Point [lng, lat] (2dsphere) }
 Token            { queue, user, number, priority, service, status: waiting|serving|served|skipped|left,
-                   counter, calledAt, arrivedAt, doneAt, pushed[] }        unique: one active token per user per queue
+                   counter, calledAt, arrivedAt, doneAt, pushed[], express{orderId, paymentId, amount} }   unique: one active token per user per queue
+ExpressOrder     { orderId (unique), queue, user, amount, used }    a Razorpay order, consumed once by the join that pays for it
 Appointment      { queue, user, at, service, note, status: booked|checked_in|cancelled|completed, token }
 PushSubscription { user, endpoint (unique), keys{p256dh, auth}, userAgent }
 ```
@@ -130,6 +136,7 @@ PushSubscription { user, endpoint (unique), keys{p256dh, auth}, userAgent }
 - Order: `priority` desc, then `number` asc. Checked-in appointments and recalled tokens are priority.
 - Each counter serves one token. **Next** completes that counter's token and calls the next waiting one to it. **Skip** marks it skipped. **Complete** finishes without calling anyone. Reducing `counters` returns anyone stranded above the new limit to the front of the line.
 - **Grace period**: a called customer who hasn't been marked **Arrived** within `graceMinutes` is auto-skipped (sweeper runs every 20 s). **Recall** puts a skipped customer back at the front with priority and re-arms their alert.
+- **Express slots**: a vendor can sell up to `perHour` front-of-line tokens per rolling hour. The client pays a Razorpay order the server created; the join is accepted only with a valid signature, for an order that belongs to that user and shop, and that has not been used. Off for `government` shops.
 - **ETA** is service-aware: the sum of each token's service duration ahead of you, plus remaining time at the counters, divided by the number of counters. `avgServiceMinutes` is learned: `0.7·avg + 0.3·actual` on every completion.
 - Analytics days run midnight to midnight UTC.
 
@@ -144,7 +151,8 @@ PushSubscription { user, endpoint (unique), keys{p256dh, auth}, userAgent }
 | POST | `/api/queues` | staff/admin | starts `pending` unless admin or `AUTO_APPROVE_SHOPS=1` |
 | GET | `/api/queues/:id` | optional | `QueueState`; unapproved shops only for owner/admin |
 | PATCH | `/api/queues/:id` | owner/admin | profile fields, `counters`, `graceMinutes`, `services[]`, `location{lat,lng}` |
-| POST | `/api/queues/:id/join` | any | `{ service? }` → `{ ticket }` |
+| POST | `/api/queues/:id/express/order` | any | Razorpay order for one express slot → `{ orderId, amount, currency, keyId }` · 409 when the hour is sold out |
+| POST | `/api/queues/:id/join` | any | `{ service?, express?: { orderId, paymentId, signature } }` → `{ ticket }`; a verified payment buys a priority token |
 | POST | `/api/queues/:id/next` · `/skip` · `/complete` | owner/admin | `{ counter? }` (default 1) |
 | POST | `/api/queues/:id/arrived/:tokenId` · `/recall/:tokenId` | owner/admin | check in · un-skip |
 | GET | `/api/queues/:id/stats` | owner/admin | `?days=1|7|30` — totals, avg wait, per-hour, per-day, weekday×hour heatmap |

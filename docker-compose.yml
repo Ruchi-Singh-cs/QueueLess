@@ -40,6 +40,9 @@ services:
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
       VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:admin@example.com}
+      # Razorpay for express slots; blank hides the feature
+      RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID:-}
+      RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET:-}
       # New businesses wait for an admin to verify them unless this is 1.
       AUTO_APPROVE_SHOPS: ${AUTO_APPROVE_SHOPS:-}
       SEED: "1"   # seed sample data on start (idempotent); remove once there is real data
