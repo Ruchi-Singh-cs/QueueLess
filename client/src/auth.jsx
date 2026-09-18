@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
-import { readAuth, writeAuth, resetSocket } from './api.js'
+import { api, readAuth, writeAuth, resetSocket } from './api.js'
 import { unsubscribePush } from './lib/push.js'
 import { roleHome } from './lib/format.js'
 import { useToast } from './ui/Toast.jsx'
@@ -9,6 +9,11 @@ const AuthContext = createContext(null)
 
 export function AuthProvider({ children }) {
   const [auth, setAuth] = useState(readAuth)
+  // the stored user is a snapshot from login: pick up a role an admin changed since (and drop an expired token — api() redirects on 401)
+  useEffect(() => {
+    if (auth.token) api('/api/auth/me').then(({ user }) => setAuth((a) => { const next = { ...a, user }; writeAuth(next); return next })).catch(() => {})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   function login(data) {
     writeAuth(data)

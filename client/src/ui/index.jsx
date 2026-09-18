@@ -30,7 +30,8 @@ export const Button = forwardRef(function Button(
 
   if (to) return <MLink {...bind} to={to} className={cls} {...p}>{inner}</MLink>
   if (href) return <motion.a {...bind} href={href} className={cls} {...p}>{inner}</motion.a>
-  return <motion.button {...bind} type="button" className={cls} disabled={loading || p.disabled} {...p}>{inner}</motion.button>
+  // disabled goes after the spread: an explicit disabled={false} must not re-enable a button mid-request
+  return <motion.button {...bind} type="button" className={cls} {...p} disabled={loading || p.disabled}>{inner}</motion.button>
 })
 const MLink = motion.create ? motion.create(Link) : motion(Link)
 const mergeRefs = (...refs) => (node) => refs.forEach((r) => { if (typeof r === 'function') r(node); else if (r) r.current = node })

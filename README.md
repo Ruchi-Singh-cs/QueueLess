@@ -41,6 +41,10 @@ docker compose exec app node scripts/demo.js         # re-stage the demo
 docker compose run --rm app node scripts/vapid.js    # generate push keys
 ```
 
+### On Render (public URL, HTTPS, no laptop)
+
+Dashboard → **New → Blueprint** → pick this repo. `render.yaml` defines the service; Render prompts for `MONGO_URI` (an Atlas cluster with Network Access set to `0.0.0.0/0`), `ADMIN_EMAIL` and the two VAPID keys (`cd server && npm run vapid`). `DEMO=1` stages the demo on every boot — change it to `SEED=1` or remove it once there is real data. The free plan sleeps after 15 idle minutes; the first request then takes ~30 s.
+
 ### Without Docker
 
 ```bash

@@ -55,14 +55,16 @@ export async function joinQueue(queue, userId, { priority = false, service = '' 
 const locks = new Map(); // ponytail: in-process per-queue mutex; use a CAS on queue.currentToken if >1 server process
 const withLock = (key, fn) => { const run = (locks.get(key) ?? Promise.resolve()).then(fn, fn); locks.set(key, run.catch(() => {})); return run; };
 /** mode: 'next' | 'skip' | 'complete'. counter: which counter (1..queue.counters) is acting. */
-export const callNext = (queueId, mode, counter = 1) => withLock(String(queueId), () => advance(queueId, mode, counter));
+/** `only`: the token the caller means to act on; a no-op if that counter has since moved on or the customer was checked in (the sweeper decides who is late outside the lock). */
+export const callNext = (queueId, mode, counter = 1, only) => withLock(String(queueId), () => advance(queueId, mode, counter, only));
 
-async function advance(queueId, mode, counter) {
+async function advance(queueId, mode, counter, only) {
   const queue = await Queue.findById(queueId);
   const now = new Date();
   counter = Math.min(Math.max(1, Number(counter) || 1), queue.counters || 1);
   // the token this counter is currently serving (legacy tokens without a counter belong to counter 1)
   const done = await Token.findOne({ queue: queue._id, status: 'serving', $or: [{ counter }, ...(counter === 1 ? [{ counter: null }] : [])] });
+  if (only && (String(done?._id) !== String(only) || done.arrivedAt)) return { queue, done: null, next: null };
   if (done) {
     done.status = mode === 'skip' ? 'skipped' : 'served';
     done.doneAt = now;
@@ -238,8 +240,8 @@ export function startGraceSweeper(io) {
           $or: [{ counter: { $lte: q.counters || 1 } }, { counter: null }],
         });
         for (const t of late) {
-          const { done } = await callNext(q._id, 'skip', t.counter ?? 1);
-          await broadcastQueue(io, q._id, done ? [done._id] : []);
+          const { done } = await callNext(q._id, 'skip', t.counter ?? 1, t._id);
+          if (done) await broadcastQueue(io, q._id, [done._id]);
         }
       }
     } catch (err) { console.error('grace sweeper', err); }

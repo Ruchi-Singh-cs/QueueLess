@@ -360,4 +360,33 @@ test('queue flow over HTTP', async () => {
   r = await api('DELETE', '/api/push/subscribe', { token: user2, body: { endpoint: sub.endpoint } });
   assert.equal(r.status, 200);
   assert.equal(await Sub.countDocuments({ endpoint: sub.endpoint }), 0);
+
+  // ---- sweeper guard, whole-number counters, unverified bookings, live role changes ----
+  // the grace sweeper names the token it means to skip: if that counter has moved on, or the customer
+  // arrived meanwhile, the skip is dropped instead of landing on whoever is standing there now
+  const { callNext } = await import('../src/queue.js');
+  const Tok = mongoose.model('Token');
+  r = await api('POST', `/api/queues/${qid}/next`, { token: staff, body: { counter: 1 } });
+  const called = r.body.serving.find((t) => t.counter === 1);
+  assert.ok(called, 'someone was called to counter 1');
+  assert.equal((await callNext(qid, 'skip', 1, new mongoose.Types.ObjectId())).done, null);
+  assert.equal((await Tok.findById(called._id)).status, 'serving');
+  await api('POST', `/api/queues/${qid}/arrived/${called._id}`, { token: staff });
+  assert.equal((await callNext(qid, 'skip', 1, called._id)).done, null);
+  assert.equal((await Tok.findById(called._id)).status, 'serving');
+  r = await api('PATCH', `/api/queues/${qid}`, { token: staff, body: { counters: 2.5 } });
+  assert.equal(r.status, 400);
+  // nobody can book at a shop that isn't live yet
+  r = await api('POST', '/api/queues', { token: staff2, body: { name: 'Unverified Shop' } });
+  assert.equal(r.body.queue.status, 'pending');
+  r = await api('POST', '/api/appointments', { token: user1, body: { queue: r.body.queue._id, at: new Date(Date.now() + 3600e3).toISOString() } });
+  assert.equal(r.status, 403);
+  // a role changed by an admin applies on the very next request, with the token the user already holds
+  r = await api('PATCH', `/api/admin/users/${uid(user3)}`, { token: admin, body: { role: 'staff' } });
+  assert.equal(r.body.user.role, 'staff');
+  r = await api('POST', '/api/queues', { token: user3, body: { name: 'Promoted Shop' } });
+  assert.equal(r.status, 201);
+  await api('PATCH', `/api/admin/users/${uid(staff2)}`, { token: admin, body: { role: 'user' } });
+  r = await api('POST', '/api/queues', { token: staff2, body: { name: 'Demoted Shop' } });
+  assert.equal(r.status, 403);
 });

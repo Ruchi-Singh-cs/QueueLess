@@ -35,6 +35,7 @@ app.use('/api/tokens', tokenRoutes);
 app.use('/api/appointments', appointmentRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/push', pushRoutes);
+app.get('/healthz', (req, res) => res.json({ ok: true }));
 app.use('/api', (req, res) => res.status(404).json({ error: 'not found' }));
 
 const dist = fileURLToPath(new URL('../../client/dist', import.meta.url));

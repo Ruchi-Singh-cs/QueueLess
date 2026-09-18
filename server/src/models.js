@@ -23,7 +23,7 @@ const queueSchema = new Schema({
   counter: { type: Number, default: 0 },
   counterDate: String,
   currentToken: { type: Schema.Types.ObjectId, ref: 'Token', default: null }, // most recently called token
-  counters: { type: Number, default: 1, min: 1, max: 20 }, // how many customers can be served at once
+  counters: { type: Number, default: 1, min: 1, max: 20, validate: Number.isInteger }, // how many customers can be served at once
   graceMinutes: { type: Number, default: 0, min: 0, max: 60 }, // 0 = off; else a called customer who hasn't arrived is auto-skipped after this
   status: { type: String, enum: SHOP_STATUS, default: () => (process.env.AUTO_APPROVE_SHOPS === '1' ? 'approved' : 'pending') },
   category: { type: String, enum: CATEGORIES, default: 'other' },

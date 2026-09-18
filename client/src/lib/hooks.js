@@ -5,10 +5,12 @@ import { api, getSocket } from '../api.js'
 export function useFetch(path, { query, deps = [], enabled = true } = {}) {
   const [state, setState] = useState({ data: null, error: null, loading: !!enabled })
   const key = JSON.stringify([path, query, enabled])
+  const seq = useRef(0) // only the latest request may land, so a slow earlier query can't overwrite a newer one
   const load = useCallback(() => {
     if (!enabled) return setState({ data: null, error: null, loading: false })
     setState((s) => ({ ...s, loading: true, error: null }))
-    api(path, { query }).then((data) => setState({ data, error: null, loading: false })).catch((e) => setState({ data: null, error: e.message, loading: false }))
+    const n = ++seq.current
+    api(path, { query }).then((data) => n === seq.current && setState({ data, error: null, loading: false })).catch((e) => n === seq.current && setState({ data: null, error: e.message, loading: false }))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, ...deps])
   useEffect(load, [load])
