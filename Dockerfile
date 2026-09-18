@@ -2,7 +2,7 @@
 # so the built front end ships inside the API container and everything is same-origin on one port.
 
 # ---- 1. build the front end ----
-FROM node:22-alpine AS client
+FROM node:22-bookworm-slim AS client
 WORKDIR /build
 COPY client/package.json client/package-lock.json ./
 RUN npm ci
@@ -12,17 +12,17 @@ RUN npm run build
 # ---- 2. server dependencies, production only ----
 # --omit=dev leaves out mongodb-memory-server, which would otherwise download a mongod binary
 # into the image. It is only imported when MONGO_URI is unset, and in Docker it always is set.
-FROM node:22-alpine AS deps
+FROM node:22-bookworm-slim AS deps
 WORKDIR /build
 COPY server/package.json server/package-lock.json ./
 RUN npm ci --omit=dev
 
 # ---- 3. runtime ----
-FROM node:22-alpine
+FROM node:22-bookworm-slim
 ENV NODE_ENV=production
 WORKDIR /app
 
-RUN apk add --no-cache tini wget
+RUN apt-get update && apt-get install -y tini wget && rm -rf /var/lib/apt/lists/*
 
 # app.js resolves ../../client/dist from server/src, so the two must keep this shape
 COPY --from=deps  /build/node_modules  ./server/node_modules
