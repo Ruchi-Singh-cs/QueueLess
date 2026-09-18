@@ -148,7 +148,7 @@ export async function demo() {
       name: PENDING, owner: owner._id, status: 'pending', category: 'salon', avgServiceMinutes: 25,
       description: 'New unisex studio — cuts, colour and skin treatments. Just signed up to QueueLess.',
       phone: '+91 98765 70707', email: owner.email, isOpen: true, counters: 2,
-      address: { street: '3 Parvati Bagla Road', city: 'Kanpur', state: 'Uttar Pradesh', pincode: '208001' },
+      address: { street: '3 Parvati Bagla Road', city: process.env.SEED_CITY || 'Kanpur', state: process.env.SEED_STATE || 'Uttar Pradesh', pincode: process.env.SEED_PINCODE || '208001' },
       hours: { open: '10:00', close: '20:00' },
       services: [{ name: 'Haircut', minutes: 25 }, { name: 'Hair Colour', minutes: 60 }, { name: 'Facial', minutes: 40 }],
       location: { type: 'Point', coordinates: [center[0] + 0.002, center[1] - 0.003] },

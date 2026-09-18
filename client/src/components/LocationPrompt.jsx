@@ -24,7 +24,7 @@ export function LocationPrompt({ status, onAllow, onManual, compact, startManual
         </div>
         <div className="row gap-2 wrap mt-4" style={{ width: '100%' }}>
           <Button variant="primary" disabled={!pin} onClick={() => onManual({ lat: pin.lat, lng: pin.lng, label: pin.address || pin.name || 'Your location' })}>Use this location</Button>
-          <Button variant="ghost" onClick={() => onManual({ ...DEFAULT_CENTER, label: 'Kanpur city center' })}>Use demo city</Button>
+          <Button variant="ghost" onClick={() => onManual({ ...DEFAULT_CENTER, label: 'Lucknow city center' })}>Use demo city</Button>
           <Button variant="ghost" onClick={() => setManual(false)}>Back</Button>
         </div>
       </div>

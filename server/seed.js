@@ -8,6 +8,7 @@ const argLat = Number(process.argv[2]), argLng = Number(process.argv[3]);
 const CENTER = Number.isFinite(argLat) && Number.isFinite(argLng) ? { lat: argLat, lng: argLng }
   : { lat: Number(process.env.SEED_LAT) || 26.4499, lng: Number(process.env.SEED_LNG) || 80.3319 }; // Kanpur
 const PASSWORD = 'password';
+const CITY = { city: process.env.SEED_CITY || 'Kanpur', state: process.env.SEED_STATE || 'Uttar Pradesh', pin: Number(process.env.SEED_PINCODE) || 208001 };
 const img = (id) => `https://images.unsplash.com/${id}?w=1200&q=70&auto=format&fit=crop`;
 
 // dLat/dLng are offsets from CENTER in degrees (~0.01 ≈ 1.1 km). queue = people in line (first one is being served); served = done earlier today.
@@ -84,7 +85,7 @@ export async function seed() {
       name: s.name, description: s.description, category: s.category, owner: vendor._id, avgServiceMinutes: s.avg, image: s.image,
       isOpen: s.open !== false, status: 'approved', phone: s.phone, email: vendor.email,
       counters: s.counters ?? (s.category === 'bank' || s.category === 'government' ? 3 : 1), graceMinutes: s.grace ?? 0,
-      address: { street: s.street, city: 'Kanpur', state: 'Uttar Pradesh', pincode: String(208001 + (i % 25)) },
+      address: { street: s.street, city: CITY.city, state: CITY.state, pincode: String(CITY.pin + (i % 25)) },
       hours: { open: s.hours?.[0] ?? '09:00', close: s.hours?.[1] ?? '19:00' },
       services: s.services.map(([name, minutes]) => ({ name, minutes })),
       location: { type: 'Point', coordinates: [CENTER.lng + s.dLng, CENTER.lat + s.dLat] },

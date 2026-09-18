@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react'
 
 const KEY = 'queueless.location'
 // Default map center when the user has no location yet (matches the seed data)
-export const DEFAULT_CENTER = { lat: 26.4499, lng: 80.3319 }
+export const DEFAULT_CENTER = { lat: 26.8444, lng: 80.8590 } // Lucknow — where the demo data is seeded
 
 export const readSavedLocation = () => { try { return JSON.parse(localStorage.getItem(KEY)) } catch { return null } }
 
