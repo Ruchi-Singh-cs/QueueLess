@@ -57,6 +57,36 @@ async function history(queue, people, days = 29) {
   return docs.length;
 }
 
+/**
+ * Tokens already served earlier today. Without these, "Today" — the range Analytics opens on — holds
+ * only the handful of tokens staged for the live line, all in whichever hour you happened to run this,
+ * so the hourly chart is a single spike. Analytics days are UTC, so everything here is clamped to
+ * after UTC midnight; stage within a couple of hours of it and there is simply less to show.
+ */
+async function servedToday(queue, people, startNumber) {
+  const midnight = new Date(new Date().toISOString().slice(0, 10)).getTime();
+  const now = Date.now();
+  const from = Math.max(midnight, now - 7 * 3600e3);
+  const span = now - from - 35 * 60000; // the last half hour belongs to the live line
+  if (span < 45 * 60000) return 0;      // too soon after UTC midnight to invent a day
+  const count = Math.min(22, Math.max(5, Math.round(span / (18 * 60000))));
+  const docs = [];
+  for (let i = 0; i < count; i++) {
+    const createdAt = new Date(from + (span * (i + 0.35)) / count);
+    const service = queue.services[i % queue.services.length];
+    const calledAt = new Date(createdAt.getTime() + (3 + (i % 5) * 4) * 60000);
+    docs.push({
+      queue: queue._id, user: people[(i * 3) % people.length]._id, number: startNumber + i + 1,
+      service: service.name, status: i % 9 === 8 ? 'skipped' : 'served',
+      priority: false, pushed: [], counter: (i % 2) + 1,
+      calledAt, arrivedAt: calledAt, doneAt: new Date(calledAt.getTime() + service.minutes * 60000),
+      createdAt, updatedAt: new Date(calledAt.getTime() + service.minutes * 60000),
+    });
+  }
+  await Token.collection.insertMany(docs);
+  return docs.length;
+}
+
 export async function demo() {
   const base = await seed();
   const people = await User.find({ role: 'user' }).limit(16);
@@ -72,7 +102,8 @@ export async function demo() {
   await Token.deleteMany({ queue: shop._id });
 
   const made = await history(shop, people);
-  let n = made;
+  const earlier = await servedToday(shop, people, made);
+  let n = made + earlier;
   const others = people.filter((p) => String(p._id) !== String(customer._id));
 
   // counter 1: called a minute ago and not here yet — ~9 minutes still on the clock
@@ -130,7 +161,8 @@ export async function demo() {
     shops: base.total,
     stage: STAGE,
     history: made,
-    waiting: n - made - 3,
+    earlier,
+    waiting: n - made - earlier - 3,
     ticket: String(mine._id),
     pending: PENDING,
   };
