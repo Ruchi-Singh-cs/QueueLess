@@ -12,8 +12,8 @@ services:
         value: production
       - key: TRUST_PROXY
         value: "1"
-      - key: DEMO
-        value: "1"                      # stages the demo on every boot; switch to SEED=1 (shops only) or remove for real data
+      - key: SEED
+        value: "1"                      # seeds sample shops on boot (idempotent); remove once there is real data
       - key: MONGO_URI
         sync: false                     # Atlas connection string (Network Access must allow 0.0.0.0/0)
       - key: JWT_SECRET

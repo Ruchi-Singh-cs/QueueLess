@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 const IN_USE = `The local database in server/data is already in use by another process.
   Only one QueueLess process can use it at a time, so this usually means:
     - a server is already running in another terminal (stop it, or just use that one), or
-    - npm run seed / npm run demo is still finishing (wait for it, then start the server).
+    - npm run seed is still finishing (wait for it, then start the server).
   To run a second one alongside, point it elsewhere with MONGO_URI.`;
 
 const MISSING = `MONGO_URI is not set. In production the app needs a MongoDB connection string:
