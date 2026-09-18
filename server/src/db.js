@@ -10,8 +10,15 @@ const IN_USE = `The local database in server/data is already in use by another p
     - npm run seed / npm run demo is still finishing (wait for it, then start the server).
   To run a second one alongside, point it elsewhere with MONGO_URI.`;
 
+const MISSING = `MONGO_URI is not set. In production the app needs a MongoDB connection string:
+  Render  -> your service -> Environment -> add MONGO_URI (render.yaml marks it sync: false, so it must be set in the dashboard)
+  Docker  -> docker compose sets it for you
+  Atlas   -> Network Access must allow the host's IP (0.0.0.0/0 for cloud hosts)`;
+
 export async function connectDb() {
-  let uri = process.env.MONGO_URI;
+  // pasted values often arrive with a trailing newline or wrapped in quotes; both make mongoose reject the scheme
+  let uri = (process.env.MONGO_URI ?? '').trim().replace(/^['"]|['"]$/g, '');
+  if (!uri && process.env.NODE_ENV === 'production') throw new Error(MISSING);
   let mongo;
   if (!uri) {
     // no MONGO_URI -> embedded mongod in ./data. It is a devDependency, absent from production installs.
@@ -19,7 +26,7 @@ export async function connectDb() {
     try {
       ({ MongoMemoryServer } = await import('mongodb-memory-server'));
     } catch {
-      throw new Error('MONGO_URI is not set and the embedded database is unavailable in a production install. Set MONGO_URI to a MongoDB connection string (docker compose does this for you).');
+      throw new Error(MISSING);
     }
     const dbPath = fileURLToPath(new URL('../data', import.meta.url));
     mkdirSync(dbPath, { recursive: true });
