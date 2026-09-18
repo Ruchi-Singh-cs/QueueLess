@@ -14,15 +14,14 @@ All seeded accounts use the password **`password`** unless noted.
 | Role | Email | Password | Lands on |
 |---|---|---|---|
 | Admin (seeded) | `admin@example.com` | `password` | `/admin` |
-| Customer | `user@example.com` | `password` | `/queue` — a live ticket |
-| Vendor — demo clinic | `dr-sharma-clinic@example.com` | `password` | `/vendor` — 2 counters mid-service |
-| Vendor — awaiting approval | `newshop@example.com` | `password` | `/vendor` — pending verification |
+| Customer | `user@example.com` | `password` | `/app` |
+| Vendor | `dr-sharma-clinic@example.com` | `password` | `/vendor` |
 | Any other vendor | `<shop-name-slug>@example.com` e.g. `glow-salon@example.com`, `city-bank-main-branch@example.com` | `password` | `/vendor` |
 | Other customers | `priya@example.com`, `rahul@example.com`, `neha@example.com` … (first names from the seed) | `password` | `/app` |
 
 Registering with the email set as `ADMIN_EMAIL` in `server/.env` makes that account an admin (your own admin login is whatever you registered there). Admins can change any user's role at **Admin → Users**.
 
-> These are demo credentials for a local database. Change `JWT_SECRET` and the admin password before exposing the app anywhere public.
+> These are sample credentials for a local database. Change `JWT_SECRET` and the admin password before exposing the app anywhere public.
 
 ## Run
 
@@ -32,25 +31,25 @@ Registering with the email set as `ADMIN_EMAIL` in `server/.env` makes that acco
 docker compose up --build        # → http://localhost:4000
 ```
 
-One image serves the API, WebSocket and the built front end on a single port; MongoDB runs beside it on a named volume. The first start seeds the demo and stages the walkthrough in [DEMO.md](DEMO.md).
+One image serves the API, WebSocket and the built front end on a single port; MongoDB runs beside it on a named volume. The first start seeds the sample shops and accounts.
 
 ```bash
 docker compose down              # stop, keep data
 docker compose down -v           # stop and wipe
-docker compose exec app node scripts/demo.js         # re-stage the demo
+docker compose exec app node scripts/seed.js         # re-seed sample data
 docker compose run --rm app node scripts/vapid.js    # generate push keys
 ```
 
 ### On Render (public URL, HTTPS, no laptop)
 
-Dashboard → **New → Blueprint** → pick this repo. `render.yaml` defines the service; Render prompts for `MONGO_URI` (an Atlas cluster with Network Access set to `0.0.0.0/0`), `ADMIN_EMAIL` and the two VAPID keys (`cd server && npm run vapid`). `DEMO=1` stages the demo on every boot — change it to `SEED=1` or remove it once there is real data. The free plan sleeps after 15 idle minutes; the first request then takes ~30 s.
+Dashboard → **New → Blueprint** → pick this repo. `render.yaml` defines the service; Render prompts for `MONGO_URI` (an Atlas cluster with Network Access set to `0.0.0.0/0`), `ADMIN_EMAIL` and the two VAPID keys (`cd server && npm run vapid`). `SEED=1` seeds sample data on every boot — remove it once there is real data. The free plan sleeps after 15 idle minutes; the first request then takes ~30 s.
 
 ### Without Docker
 
 ```bash
 # server — embedded MongoDB persists in server/data, nothing to install
-cd server && cp .env.example .env && npm install
-npm run demo        # seeds shops + accounts and stages the demo (safe to re-run)
+cd server && npm install   # create server/.env from the Environment section below
+npm run seed        # sample shops + accounts, password "password" (safe to re-run)
 npm run dev         # http://localhost:4000
 
 # client — second terminal
@@ -59,13 +58,7 @@ cd client && npm install && npm run dev      # http://localhost:5173
 
 `npm run seed` seeds without staging; `npm test` runs the server suite; `npm run build` in `client/` produces `dist/`, which the server serves on `:4000` in production.
 
-Only one process can use the embedded database at a time. Starting a second server, or a server while `npm run demo` is still running, fails immediately with a message saying so.
-
-### The demo
-
-`npm run demo` (or the Docker first start) sets up **Dr. Sharma Clinic** with two counters mid-service, a no-show timer counting down, a skipped customer ready to recall, tokens served earlier today, a month of history for the charts, three upcoming appointments for the customer, and **Nova Skin & Hair Studio** awaiting admin approval. Plus 22 hand-written shops and 100 generated ones within 60 km of the centre, all with addresses, hours, services, photos and live queues. **Re-run it before presenting** — the no-show timer advances the queue on its own after ~10 minutes.
-
-[DEMO.md](DEMO.md) is the 12-step walkthrough.
+Only one process can use the embedded database at a time. Starting a second server, or a server while `npm run seed` is still running, fails immediately with a message saying so.
 
 ## Environment
 
@@ -83,7 +76,7 @@ VAPID_SUBJECT=mailto:you@example.com
 
 # AUTO_APPROVE_SHOPS=1     # new shops go live without admin approval (default: pending)
 
-# Demo city: where seed/demo place the shops
+# Sample-data city: where npm run seed places the shops
 SEED_LAT=26.8492
 SEED_LNG=80.8586
 SEED_CITY=Lucknow
@@ -179,7 +172,7 @@ Guests may connect without a token. `queue:watch` / `queue:unwatch` (queueId) jo
 ```
 server/  src/app.js (express + socket)  db.js  index.js  auth.js  models.js  queue.js  push.js
          src/routes/ auth queues tokens appointments admin push
-         scripts/ seed demo vapid    test/queue.test.js
+         scripts/ seed vapid    test/queue.test.js
 client/  src/App.jsx  api.js  auth.jsx  public/sw.js (push service worker)
          lib/  hooks geo motion gsap push notifications theme format maps osm
          ui/   index.jsx (primitives, Reveal, Logo)  Modal.jsx  Toast.jsx
@@ -187,7 +180,7 @@ client/  src/App.jsx  api.js  auth.jsx  public/sw.js (push service worker)
          pages/  Landing Login Nearby Shop  user/(Home Ticket Appointments Notifications Profile)
                  vendor/(VendorContext Overview LiveQueue Appointments ShopProfile Location Services Analytics Settings)
                  admin/(Dashboard Lists)
-Dockerfile  docker-compose.yml  DEMO.md
+Dockerfile  docker-compose.yml  render.yaml
 ```
 
 ## Stack

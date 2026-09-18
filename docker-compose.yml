@@ -2,7 +2,7 @@
 #
 #   docker compose up --build     →  http://localhost:4000
 #
-# First start seeds the demo data and stages the walkthrough in DEMO.md.
+# First start seeds the sample shops and accounts (password "password").
 # Logins are printed in the app logs; the password is "password".
 
 services:
@@ -40,13 +40,11 @@ services:
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
       VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:admin@example.com}
-      # New businesses normally wait for an admin to verify them; the demo seeds its own
-      # pending shop to show that flow, so leave this unset.
+      # New businesses wait for an admin to verify them unless this is 1.
       AUTO_APPROVE_SHOPS: ${AUTO_APPROVE_SHOPS:-}
-    # re-stages the demo on every start (idempotent).
+      SEED: "1"   # seed sample data on start (idempotent); remove once there is real data
     # exec hands the process to node so tini signals it directly. If staging ever fails the server
     # still comes up, rather than the container restarting forever with nothing served.
-    command: sh -c "node scripts/demo.js || echo 'demo staging failed - starting anyway'; exec node src/index.js"
 
 volumes:
   mongo-data:
