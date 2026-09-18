@@ -40,10 +40,6 @@ docker compose exec app node scripts/seed.js         # re-seed sample data
 docker compose run --rm app node scripts/vapid.js    # generate push keys
 ```
 
-### On Render (public URL, HTTPS, no laptop)
-
-Dashboard → **New → Blueprint** → pick this repo. `render.yaml` defines the service; Render prompts for `MONGO_URI` (an Atlas cluster with Network Access set to `0.0.0.0/0`), `ADMIN_EMAIL` and the two VAPID keys (`cd server && npm run vapid`). `SEED=1` seeds sample data on every boot — remove it once there is real data. The free plan sleeps after 15 idle minutes; the first request then takes ~30 s.
-
 ### Without Docker
 
 ```bash
@@ -180,7 +176,7 @@ client/  src/App.jsx  api.js  auth.jsx  public/sw.js (push service worker)
          pages/  Landing Login Nearby Shop  user/(Home Ticket Appointments Notifications Profile)
                  vendor/(VendorContext Overview LiveQueue Appointments ShopProfile Location Services Analytics Settings)
                  admin/(Dashboard Lists)
-Dockerfile  docker-compose.yml  render.yaml
+Dockerfile  docker-compose.yml
 ```
 
 ## Stack
