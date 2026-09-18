@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { Outlet } from 'react-router-dom'
-import { Store, ArrowRight } from 'lucide-react'
+import { Store, ArrowRight, ShieldAlert, ShieldX } from 'lucide-react'
 import { api } from '../../api.js'
 import { useAuth } from '../../auth.jsx'
 import { useQueueWatch } from '../../lib/hooks.js'
@@ -11,6 +11,20 @@ import { useToast } from '../../ui/Toast.jsx'
 const Ctx = createContext(null)
 export const useVendor = () => useContext(Ctx)
 
+/** A new shop is invisible to customers until an admin approves it — say so on every vendor page. */
+function VerificationBanner({ shop }) {
+  if (!shop || (shop.status ?? 'approved') === 'approved') return null
+  return shop.status === 'suspended' ? (
+    <Alert tone="error" icon={ShieldX} className="mb-4">
+      <b>{shop.name} is suspended.</b> Customers can't find or join it, and the page is hidden. Contact an administrator to have it restored.
+    </Alert>
+  ) : (
+    <Alert tone="warning" icon={ShieldAlert} className="mb-4">
+      <b>Awaiting verification.</b> {shop.name} won't show up in Nearby or search, and nobody can take a token yet — an administrator has to approve it first. Finish your profile, services and map pin in the meantime so you're ready the moment it goes live.
+    </Alert>
+  )
+}
+
 /** Loads the vendor's shops, keeps the selected one's live QueueState fresh over Socket.IO. */
 export function VendorProvider() {
   const { user } = useAuth()
@@ -19,10 +33,11 @@ export function VendorProvider() {
   const [shopId, setShopId] = useState(() => { try { return localStorage.getItem('queueless.vendor.shop') || '' } catch { return '' } })
   const [state, setState] = useState(null)
 
-  const loadShops = useCallback(() => api('/api/queues').then((d) => {
-    const mine = user.role === 'admin' ? d.queues : d.queues.filter((q) => q.owner === user._id)
-    setShops(mine)
-    setShopId((id) => (mine.some((s) => s._id === id) ? id : mine[0]?._id || ''))
+  // mine=1 (or all=1 for admins) so a shop still awaiting verification is reachable by its owner —
+  // the plain list only returns approved shops, which would strand the vendor on the onboarding screen
+  const loadShops = useCallback(() => api('/api/queues', { query: user.role === 'admin' ? { all: '1' } : { mine: '1' } }).then((d) => {
+    setShops(d.queues)
+    setShopId((id) => (d.queues.some((s) => s._id === id) ? id : d.queues[0]?._id || ''))
   }).catch((e) => setError(e.message)), [user])
   useEffect(() => { loadShops() }, [loadShops])
   useEffect(() => { try { localStorage.setItem('queueless.vendor.shop', shopId) } catch {} }, [shopId])
@@ -42,7 +57,7 @@ export function VendorProvider() {
   if (error && !shops) return <ErrorState onRetry={() => { setError(''); loadShops() }}>{error}</ErrorState>
   if (!shops) return <div className="stack gap-4"><Skeleton h={40} w={280} /><div className="grid grid-4">{[1, 2, 3, 4].map((i) => <Skeleton key={i} h={110} r={16} />)}</div><Skeleton h={300} r={16} /></div>
   if (!shops.length) return <Ctx.Provider value={value}><Onboarding onCreated={value.onCreated} /></Ctx.Provider>
-  return <Ctx.Provider value={value}><Outlet /></Ctx.Provider>
+  return <Ctx.Provider value={value}><VerificationBanner shop={state?.queue} /><Outlet /></Ctx.Provider>
 }
 
 /** First-run: create the shop. */

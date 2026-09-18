@@ -8,12 +8,13 @@ const argLat = Number(process.argv[2]), argLng = Number(process.argv[3]);
 const CENTER = Number.isFinite(argLat) && Number.isFinite(argLng) ? { lat: argLat, lng: argLng }
   : { lat: Number(process.env.SEED_LAT) || 26.4499, lng: Number(process.env.SEED_LNG) || 80.3319 }; // Kanpur
 const PASSWORD = 'password';
+const CITY = { city: process.env.SEED_CITY || 'Kanpur', state: process.env.SEED_STATE || 'Uttar Pradesh', pin: Number(process.env.SEED_PINCODE) || 208001 };
 const img = (id) => `https://images.unsplash.com/${id}?w=1200&q=70&auto=format&fit=crop`;
 
 // dLat/dLng are offsets from CENTER in degrees (~0.01 ≈ 1.1 km). queue = people in line (first one is being served); served = done earlier today.
 const SHOPS = [
   // --- medical ---
-  { name: 'Dr. Sharma Clinic', category: 'medical', dLat: 0.004, dLng: 0.006, avg: 6, queue: 3, served: 9, street: '12 Mall Road', phone: '+91 98765 11111', image: img('photo-1519494026892-80bbd2d6fd0d'),
+  { name: 'Dr. Sharma Clinic', category: 'medical', dLat: 0.004, dLng: 0.006, avg: 6, queue: 3, served: 9, grace: 5, street: '12 Mall Road', phone: '+91 98765 11111', image: img('photo-1519494026892-80bbd2d6fd0d'),
     description: 'Family physician. Walk-ins welcome, appointments preferred.', services: [['General Consultation', 10], ['Follow-up', 6], ['Emergency', 15]] },
   { name: 'Smile Dental Care', category: 'medical', dLat: -0.03, dLng: 0.03, avg: 18, queue: 2, served: 4, street: '7 Swaroop Nagar', phone: '+91 98765 66666', image: img('photo-1606811841689-23dfddce3e95'),
     description: 'Dental check-ups, cleaning and orthodontics.', services: [['Check-up', 15], ['Cleaning', 25], ['Filling', 30]] },
@@ -64,6 +65,48 @@ const SHOPS = [
     description: 'Measurements, alterations and school uniforms.', services: [['Measurement', 10], ['Alteration Drop-off', 5], ['Trial', 15]] },
 ];
 
+// Extra shops scattered within SEED_RADIUS_KM of CENTER, so the map has depth beyond the 22 hand-written
+// ones. Fixed-seed RNG: the same names come out every run, so re-seeding matches them instead of
+// duplicating them. Set SEED_EXTRA=0 (the default) to get only the named set.
+const EXTRA = Number(process.env.SEED_EXTRA) || 0;
+const RADIUS_KM = Number(process.env.SEED_RADIUS_KM) || 60;
+const AREAS = ['Hazratganj', 'Gomti Nagar', 'Aliganj', 'Indira Nagar', 'Alambagh', 'Chowk', 'Aminabad', 'Mahanagar', 'Rajajipuram', 'Jankipuram', 'Vikas Nagar', 'Chinhat', 'Telibagh', 'Ashiyana', 'Krishna Nagar', 'Charbagh', 'Nishatganj', 'Sarojini Nagar', 'Kakori', 'Malihabad', 'Mohanlalganj', 'Bakshi Ka Talab', 'Barabanki', 'Unnao', 'Nawabganj', 'Itaunja', 'Sitapur Road', 'Hardoi Road', 'Kanpur Road', 'Rae Bareli Road', 'Faizabad Road', 'Sultanpur Road'];
+const BRANDS = ['Apex', 'Sunrise', 'Metro', 'Prime', 'Lotus', 'Shree', 'Royal', 'Elite', 'Green', 'Silver', 'Golden', 'Star', 'Sai', 'Krishna', 'Laxmi', 'Modern', 'Classic', 'Swift', 'Trust', 'United', 'National', 'Heritage', 'Zen', 'Urban', 'Central', 'Pioneer', 'Vijay', 'Anand', 'Shanti', 'Aarogya', 'Jeevan', 'Surya', 'Chandra', 'Nova', 'Ganga', 'Om', 'Navin', 'Rapid', 'Care', 'City'];
+const KINDS = {
+  medical: [['Clinic', 8, 'Walk-ins welcome, appointments preferred.', [['Consultation', 10], ['Follow-up', 6], ['Vaccination', 5]]], ['Dental Care', 18, 'Check-ups, cleaning and orthodontics.', [['Check-up', 15], ['Cleaning', 25], ['Filling', 30]]], ['Eye Care', 12, 'Eye tests, spectacles and lenses.', [['Eye Examination', 12], ['Lens Fitting', 20]]], ['Diagnostics', 8, 'Blood tests and scans, same-day reports.', [['Blood Test', 5], ['X-ray', 10], ['ECG', 10]]], ['Physiotherapy', 30, 'Sports injuries, back pain, post-surgery rehab.', [['Session', 30], ['Assessment', 20]]]],
+  salon: [['Salon', 20, 'Cuts, colour and styling.', [['Haircut', 25], ['Beard Trim', 15], ['Hair Colour', 60]]], ['Barbershop', 15, 'Fades, shaves and hot towels.', [['Haircut', 15], ['Shave', 10]]], ['Beauty Studio', 35, 'Facials, waxing and bridal make-up.', [['Facial', 40], ['Waxing', 30], ['Threading', 10]]], ['Spa', 45, 'Massage and wellness.', [['Massage', 45], ['Hair Spa', 45]]]],
+  bank: [['Bank', 8, 'Accounts, loans and lockers.', [['Account Services', 8], ['Loan Enquiry', 15], ['Cash Deposit', 4]]], ['Co-operative Bank', 9, 'Savings, KYC and demand drafts.', [['KYC Update', 10], ['Demand Draft', 6]]], ['Post Office', 7, 'Savings, speed post and passbooks.', [['Passbook Update', 5], ['Speed Post', 4]]]],
+  government: [['Tehsil Office', 14, 'Certificates and land records.', [['Certificate', 15], ['Records Enquiry', 10]]], ['Aadhaar Centre', 10, 'Enrolment and biometric updates.', [['New Enrolment', 15], ['Biometric Update', 10]]], ['Electricity Office', 5, 'Bills, new connections and complaints.', [['Bill Payment', 3], ['New Connection', 15]]], ['Municipal Office', 12, 'Water, property tax and licences.', [['Tax Payment', 8], ['Licence', 20]]]],
+  repair: [['Mobile Repair', 15, 'Phones fixed while you wait.', [['Screen', 30], ['Battery', 20], ['Diagnosis', 10]]], ['Auto Service', 40, 'Two-wheeler servicing and puncture repair.', [['Service', 45], ['Puncture', 10]]], ['Appliance Repair', 25, 'AC, fridge and washing machine.', [['Diagnosis', 15], ['Repair', 40]]], ['Computer Service', 25, 'Laptop and desktop repairs.', [['Diagnosis', 15], ['OS Reinstall', 40]]]],
+  other: [['Laundry', 4, 'Drop-off counter, same-day before noon.', [['Drop-off', 3], ['Pick-up', 3]]], ['Tailors', 12, 'Measurements and alterations.', [['Measurement', 10], ['Alteration', 5]]], ['Pet Grooming', 40, 'Baths, trims and nail clipping.', [['Bath', 30], ['Full Groom', 60]]], ['Photo Studio', 10, 'Passport photos and prints.', [['Passport Photo', 5], ['Prints', 10]]]],
+};
+function extraShops() {
+  let x = 20260918; const rnd = () => (x = (x * 1103515245 + 12345) % 2147483648) / 2147483648;
+  const cats = Object.keys(KINDS), used = new Set(SHOPS.map((s) => s.name)), out = [];
+  for (let i = 0; i < EXTRA; i++) {
+    const category = cats[i % cats.length];
+    const [kind, avg, description, services] = KINDS[category][Math.floor(rnd() * KINDS[category].length)];
+    const area = AREAS[Math.floor(rnd() * AREAS.length)];
+    let name = `${BRANDS[Math.floor(rnd() * BRANDS.length)]} ${kind}`;
+    if (used.has(name)) name += ` ${area}`;
+    if (used.has(name)) name += ` ${i}`;
+    used.add(name);
+    // uniform over the disc, not clustered at the centre
+    const r = RADIUS_KM * Math.sqrt(rnd()), th = rnd() * 2 * Math.PI;
+    const images = SHOPS.filter((s) => s.category === category).map((s) => s.image);
+    out.push({
+      name, category, avg, description, services,
+      dLat: (r * Math.cos(th)) / 111, dLng: (r * Math.sin(th)) / (111 * Math.cos((CENTER.lat * Math.PI) / 180)),
+      street: `${1 + Math.floor(rnd() * 200)} ${area}`, phone: `+91 9${String(Math.floor(rnd() * 1e9)).padStart(9, '0')}`,
+      image: images[i % images.length], open: rnd() > 0.12,
+      hours: category === 'bank' || category === 'government' ? ['10:00', '17:00'] : ['09:00', '20:00'],
+      queue: Math.floor(rnd() * 7), served: 2 + Math.floor(rnd() * 12),
+      counters: category === 'bank' || category === 'government' ? 2 + Math.floor(rnd() * 2) : 1,
+    });
+  }
+  return out;
+}
+
 const CUSTOMERS = ['Priya', 'Rahul', 'Neha', 'Vikram', 'Sana', 'Kabir', 'Ananya', 'Rohan', 'Isha', 'Arjun', 'Meera', 'Dev', 'Zara', 'Karan', 'Pooja', 'Aditya'];
 const slug = (s) => s.toLowerCase().replace(/[^a-z]+/g, '-').replace(/^-|-$/g, '');
 
@@ -77,13 +120,14 @@ export async function seed() {
   const people = await Promise.all(CUSTOMERS.map((n) => upsertUser(n, `${n.toLowerCase()}@example.com`, 'user')));
   const day = new Date().toISOString().slice(0, 10);
   const created = [];
-  for (const [i, s] of SHOPS.entries()) {
+  for (const [i, s] of [...SHOPS, ...extraShops()].entries()) {
     if (await Queue.exists({ name: s.name })) continue;
     const vendor = await upsertUser(`${s.name} Owner`, `${slug(s.name)}@example.com`, 'staff');
     const queue = await Queue.create({
       name: s.name, description: s.description, category: s.category, owner: vendor._id, avgServiceMinutes: s.avg, image: s.image,
-      isOpen: s.open !== false, phone: s.phone, email: vendor.email,
-      address: { street: s.street, city: 'Kanpur', state: 'Uttar Pradesh', pincode: String(208001 + (i % 25)) },
+      isOpen: s.open !== false, status: 'approved', phone: s.phone, email: vendor.email,
+      counters: s.counters ?? (s.category === 'bank' || s.category === 'government' ? 3 : 1), graceMinutes: s.grace ?? 0,
+      address: { street: s.street, city: CITY.city, state: CITY.state, pincode: String(CITY.pin + (i % 25)) },
       hours: { open: s.hours?.[0] ?? '09:00', close: s.hours?.[1] ?? '19:00' },
       services: s.services.map(([name, minutes]) => ({ name, minutes })),
       location: { type: 'Point', coordinates: [CENTER.lng + s.dLng, CENTER.lat + s.dLat] },
@@ -95,11 +139,13 @@ export async function seed() {
       const createdAt = new Date(now - (s.served - k) * s.avg * 60000 * 1.4 - 30 * 60000);
       const calledAt = new Date(createdAt.getTime() + s.avg * 60000 * (0.6 + (k % 3) * 0.3));
       const t = await Token.create({ queue: queue._id, user: people[(k * 7 + i) % people.length]._id, number: ++counter, service: queue.services[k % queue.services.length].name, status: k % 9 === 8 ? 'skipped' : 'served', calledAt, doneAt: new Date(calledAt.getTime() + s.avg * 60000) });
-      await Token.updateOne({ _id: t._id }, { $set: { createdAt } });
+      await Token.collection.updateOne({ _id: t._id }, { $set: { createdAt } }); // .collection: Mongoose strips createdAt from $set
     }
+    // one customer at each counter, the rest waiting
     for (let k = 0; k < s.queue; k++) {
-      const t = await Token.create({ queue: queue._id, user: people[(k + i * 3) % people.length]._id, number: ++counter, service: queue.services[k % queue.services.length].name, status: k === 0 ? 'serving' : 'waiting', calledAt: k === 0 ? new Date(now - 3 * 60000) : undefined });
-      if (k === 0) queue.currentToken = t._id;
+      const atCounter = k < queue.counters;
+      const t = await Token.create({ queue: queue._id, user: people[(k + i * 3) % people.length]._id, number: ++counter, service: queue.services[k % queue.services.length].name, status: atCounter ? 'serving' : 'waiting', counter: atCounter ? k + 1 : undefined, calledAt: atCounter ? new Date(now - (3 + k) * 60000) : undefined, arrivedAt: atCounter && k % 2 ? new Date(now - k * 60000) : undefined });
+      if (atCounter) queue.currentToken = t._id;
     }
     queue.counter = counter;
     queue.counterDate = day;

@@ -50,7 +50,7 @@ export function useTicketUpdates(onTicket) {
 }
 
 /** Apply a queue:update payload to a shop summary object. */
-export const applyUpdate = (q, u) => ({ ...q, isOpen: u.isOpen, avgServiceMinutes: u.avgServiceMinutes, currentNumber: u.currentNumber, waitingCount: u.waitingNumbers.length, etaMinutes: Math.round(u.waitingNumbers.length * u.avgServiceMinutes) })
+export const applyUpdate = (q, u) => ({ ...q, isOpen: u.isOpen, avgServiceMinutes: u.avgServiceMinutes, currentNumber: u.currentNumber, waitingCount: u.waitingNumbers.length, etaMinutes: u.etaMinutes ?? Math.round(u.waitingNumbers.length * u.avgServiceMinutes) })
 
 export function useDebounced(value, ms = 300) {
   const [v, setV] = useState(value)

@@ -4,6 +4,13 @@ import mongoose from 'mongoose';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 
 process.env.JWT_SECRET = 'test-secret';
+process.env.NODE_ENV = 'test';
+process.env.AUTO_APPROVE_SHOPS = '1';
+// a throwaway VAPID pair so the push routes run in their configured shape — generated per run rather
+// than hardcoded, so no private key ever lands in the repo
+const vapid = (await import('web-push')).default.generateVAPIDKeys();
+process.env.VAPID_PUBLIC_KEY = vapid.publicKey;
+process.env.VAPID_PRIVATE_KEY = vapid.privateKey;
 const { server, io } = await import('../src/app.js');
 
 let mongo, base;
@@ -219,4 +226,138 @@ test('queue flow over HTTP', async () => {
   assert.ok(r.body.users.length >= 6 && r.body.users[0].passwordHash === undefined);
   r = await api('PATCH', '/api/auth/me', { token: user1, body: { name: 'User One' } });
   assert.equal(r.body.user.name, 'User One');
+
+  // ---- service-aware ETA, multi-counter, arrived/recall, verification, push, stats range ----
+  r = await api('PATCH', `/api/queues/${qid}`, { token: staff, body: { counters: 2, graceMinutes: 5, services: [{ name: 'General Consultation', minutes: 10 }, { name: 'Follow-up', minutes: 5 }] } });
+  assert.equal(r.status, 200);
+  assert.deepEqual([r.body.queue.counters, r.body.queue.graceMinutes], [2, 5]);
+  // fresh line: clear every token still active from the earlier rounds, then user2 (Follow-up 5), user3 (General 10) join
+  for (const token of [user1, user2, user3]) {
+    for (const t of (await api('GET', '/api/tokens/mine', { token })).body.tickets) {
+      if (t.status === 'waiting') await api('DELETE', `/api/tokens/${t._id}`, { token });
+      else await api('POST', `/api/queues/${qid}/complete`, { token: staff, body: { counter: t.counter ?? 1 } });
+    }
+  }
+  assert.deepEqual((await api('GET', `/api/queues/${qid}`, { token: staff })).body.serving, []);
+  r = await api('POST', `/api/queues/${qid}/join`, { token: user2, body: { service: 'Follow-up' } });
+  assert.equal(r.status, 201);
+  const u2 = r.body.ticket._id;
+  r = await api('POST', `/api/queues/${qid}/join`, { token: user3, body: { service: 'General Consultation' } });
+  assert.equal(r.status, 201);
+  const u3 = r.body.ticket._id;
+  assert.equal(r.body.ticket.ahead, 1);
+  assert.equal(r.body.ticket.etaMinutes, 3); // 5 min of Follow-up ahead, spread over 2 counters → round(2.5)
+  r = await api('GET', `/api/queues/${qid}`);
+  assert.equal(r.body.queue.etaMinutes, 8); // (5 + 10) / 2
+  // counter 2 calls next → user2 at counter 2; counter 1 calls next → user3 at counter 1
+  r = await api('POST', `/api/queues/${qid}/next`, { token: staff, body: { counter: 2 } });
+  assert.equal(r.status, 200);
+  assert.deepEqual(r.body.serving.map((t) => [t._id, t.counter]), [[u2, 2]]);
+  r = await api('GET', `/api/tokens/${u2}`, { token: user2 });
+  assert.deepEqual([r.body.ticket.status, r.body.ticket.counter, !!r.body.ticket.arriveBy], ['serving', 2, true]);
+  r = await api('POST', `/api/queues/${qid}/next`, { token: staff, body: { counter: 1 } });
+  assert.equal(r.body.serving.length, 2);
+  assert.deepEqual(r.body.serving.map((t) => t.counter).sort(), [1, 2]);
+  // arrived stops the grace timer
+  r = await api('POST', `/api/queues/${qid}/arrived/${u2}`, { token: staff });
+  assert.equal(r.status, 200);
+  assert.ok(r.body.serving.find((t) => t._id === u2).arrivedAt);
+  r = await api('GET', `/api/tokens/${u2}`, { token: user2 });
+  assert.equal(r.body.ticket.arriveBy, null);
+  // counter 1 skips user3 (no-show) → recall puts them back at the front with priority
+  r = await api('POST', `/api/queues/${qid}/skip`, { token: staff, body: { counter: 1 } });
+  assert.equal(r.status, 200);
+  assert.equal(r.body.skipped[0]._id, u3);
+  assert.equal(r.body.serving.length, 1); // counter 2 still busy, counter 1 free (nobody waiting)
+  r = await api('POST', `/api/queues/${qid}/recall/${u3}`, { token: staff });
+  assert.equal(r.status, 200);
+  assert.deepEqual([r.body.waiting[0]._id, r.body.waiting[0].priority, r.body.skipped.length], [u3, true, 0]);
+  // recall clears the push history, so the customer is told they're next again and gets "your turn" when re-called
+  const pushed = (await mongoose.model('Token').findById(u3)).pushed;
+  assert.ok(pushed.includes('next') && !pushed.includes('turn') && !pushed.includes('skipped'));
+  r = await api('POST', `/api/queues/${qid}/recall/${u3}`, { token: staff });
+  assert.equal(r.status, 400);
+  r = await api('POST', `/api/queues/${qid}/arrived/${u3}`, { token: user3 });
+  assert.equal(r.status, 403);
+  // lowering "counters" must not strand whoever is being served above the new limit: staff can't see
+  // them, they can never be completed, and the grace sweeper would skip the wrong customer in their place
+  r = await api('PATCH', `/api/queues/${qid}`, { token: staff, body: { counters: 3 } });
+  assert.equal(r.body.queue.counters, 3);
+  r = await api('POST', `/api/queues/${qid}/next`, { token: staff, body: { counter: 3 } });
+  const stray = r.body.serving.find((t) => t.counter === 3);
+  assert.ok(stray, 'counter 3 called someone');
+  r = await api('PATCH', `/api/queues/${qid}`, { token: staff, body: { counters: 1 } });
+  assert.equal(r.body.serving.filter((t) => t.counter > 1).length, 0);
+  assert.ok(r.body.waiting.some((t) => t._id === stray._id && t.priority)); // back at the front, not lost
+  assert.ok(r.body.queue.currentNumber === null || r.body.serving.some((t) => t.number === r.body.queue.currentNumber));
+  r = await api('GET', `/api/tokens/${stray._id}`, { token: staff });
+  assert.equal(r.body.ticket.status, 'waiting');
+  await api('PATCH', `/api/queues/${qid}`, { token: staff, body: { counters: 2 } });
+
+  // stats ranges
+  r = await api('GET', `/api/queues/${qid}/stats?days=7`, { token: staff });
+  assert.equal(r.status, 200);
+  assert.ok(r.body.byDay.length === 7 && r.body.heat.length === 7 && r.body.heat[0].length === 24 && r.body.served >= 1);
+  // business verification: pending shops are hidden from the public list/nearby until approved
+  process.env.AUTO_APPROVE_SHOPS = '';
+  r = await api('POST', '/api/queues', { token: staff2, body: { name: 'New Pending Shop' } });
+  assert.equal(r.body.queue.status, 'pending');
+  const pending = r.body.queue._id;
+  await api('PATCH', `/api/queues/${pending}`, { token: staff2, body: { location: { lat: 26.451, lng: 80.331 } } });
+  r = await api('GET', '/api/queues');
+  assert.ok(!r.body.queues.some((q) => q._id === pending));
+  r = await api('GET', '/api/queues/nearby?lat=26.451&lng=80.331&radius=5');
+  assert.ok(!r.body.queues.some((q) => q._id === pending));
+  r = await api('GET', `/api/queues/${pending}`, { token: staff2 }); // the owner can still open it
+  assert.equal(r.status, 200);
+  // ...and reach it from their dashboard, which the public list would hide (leaving them stuck on onboarding)
+  r = await api('GET', '/api/queues?mine=1', { token: staff2 });
+  assert.ok(r.body.queues.some((q) => q._id === pending));
+  r = await api('GET', '/api/queues?mine=1', { token: user1 }); // mine=1 is scoped to the caller, not a back door
+  assert.ok(!r.body.queues.some((q) => q._id === pending));
+  r = await api('GET', '/api/queues?all=1', { token: staff2 }); // all=1 stays admin-only
+  assert.ok(!r.body.queues.some((q) => q._id === pending));
+  r = await api('GET', `/api/queues/${pending}`, { token: user1 }); // nobody else can, even with the id
+  assert.equal(r.status, 404);
+  r = await api('POST', `/api/queues/${pending}/join`, { token: user1 }); // and nobody can join before approval
+  assert.equal(r.status, 403);
+  r = await api('PATCH', `/api/admin/shops/${pending}`, { token: staff2, body: { status: 'approved' } });
+  assert.equal(r.status, 403);
+  r = await api('PATCH', `/api/admin/shops/${pending}`, { token: admin, body: { status: 'approved' } });
+  assert.equal(r.body.shop.status, 'approved');
+  r = await api('GET', '/api/queues/nearby?lat=26.451&lng=80.331&radius=5');
+  assert.ok(r.body.queues.some((q) => q._id === pending));
+  r = await api('PATCH', `/api/admin/shops/${pending}`, { token: admin, body: { status: 'suspended' } });
+  r = await api('POST', `/api/queues/${pending}/join`, { token: user1 });
+  assert.equal(r.status, 403);
+  r = await api('GET', `/api/queues/${pending}`, { token: user1 });
+  assert.equal(r.status, 404);
+  r = await api('GET', '/api/queues?all=1', { token: admin });
+  assert.ok(r.body.queues.some((q) => q._id === pending));
+  r = await api('GET', '/api/admin/stats', { token: admin });
+  assert.equal(typeof r.body.pendingShops, 'number');
+  // push subscriptions — the client reads publicKey/enabled from /key before it can subscribe at all
+  const uid = (t) => JSON.parse(Buffer.from(t.split('.')[1], 'base64url')).id;
+  r = await api('GET', '/api/push/key');
+  assert.equal(r.status, 200);
+  assert.deepEqual([r.body.enabled, r.body.publicKey], [true, process.env.VAPID_PUBLIC_KEY]);
+  const Sub = mongoose.model('PushSubscription');
+  const sub = { endpoint: 'https://push.example.com/abc', keys: { p256dh: 'p', auth: 'a' } };
+  r = await api('POST', '/api/push/subscribe', { token: user1, body: sub });
+  assert.equal(r.status, 201);
+  assert.equal(String((await Sub.findOne({ endpoint: sub.endpoint })).user), uid(user1));
+  // the client posts { subscription } too (that's what PushSubscription.toJSON() hands it) and re-posts on
+  // every load to rebind the device to whoever is logged in now — that must move the row, not add a second
+  r = await api('POST', '/api/push/subscribe', { token: user2, body: { subscription: sub } });
+  assert.equal(r.status, 201);
+  assert.equal(await Sub.countDocuments({ endpoint: sub.endpoint }), 1);
+  assert.equal(String((await Sub.findOne({ endpoint: sub.endpoint })).user), uid(user2));
+  r = await api('POST', '/api/push/subscribe', { token: user1, body: { endpoint: 'http://insecure', keys: { p256dh: 'p', auth: 'a' } } });
+  assert.equal(r.status, 400);
+  r = await api('DELETE', '/api/push/subscribe', { token: user1, body: { endpoint: sub.endpoint } });
+  assert.equal(r.status, 200);
+  assert.equal(await Sub.countDocuments({ endpoint: sub.endpoint }), 1); // not user1's device any more
+  r = await api('DELETE', '/api/push/subscribe', { token: user2, body: { endpoint: sub.endpoint } });
+  assert.equal(r.status, 200);
+  assert.equal(await Sub.countDocuments({ endpoint: sub.endpoint }), 0);
 });

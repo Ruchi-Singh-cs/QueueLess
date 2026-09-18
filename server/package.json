@@ -6,14 +6,17 @@
     "dev": "node --watch --env-file=.env src/index.js",
     "start": "node --env-file=.env src/index.js",
     "test": "node --test",
-    "seed": "node --env-file=.env seed.js"
+    "seed": "node --env-file=.env seed.js",
+    "vapid": "node vapid.js",
+    "demo": "node --env-file=.env demo.js"
   },
   "dependencies": {
     "bcryptjs": "^3",
     "express": "^5",
     "jsonwebtoken": "^9",
     "mongoose": "^8",
-    "socket.io": "^4"
+    "socket.io": "^4",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
     "mongodb-memory-server": "^10"

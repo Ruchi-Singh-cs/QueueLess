@@ -7,20 +7,40 @@ import { Button, Field, Input, Select, Switch, Segmented, Alert, PageTransition 
 import { Modal } from '../../ui/Modal.jsx'
 import { useToast } from '../../ui/Toast.jsx'
 
+/** An inline "number + Save" settings row. Declared out here so typing never remounts the input. */
+function NumberRow({ name, label, hint, saved, unit, min, max, step = 1, msg, draft, setDraft, save, busy }) {
+  const value = draft[name] ?? saved
+  const dirty = Number(value) !== saved && value !== ''
+  return (
+    <form className="between wrap gap-3" onSubmit={(e) => { e.preventDefault(); save({ [name]: Number(value) }, msg, name) }}>
+      <span className="stack"><b>{label}</b><span className="small muted">{hint}</span></span>
+      <div className="row gap-2">
+        <Input type="number" min={min} max={max} step={step} value={value} onChange={(e) => setDraft((d) => ({ ...d, [name]: e.target.value }))} style={{ width: 92 }} aria-label={label} />
+        {unit && <span className="small muted" style={{ whiteSpace: 'nowrap' }}>{unit}</span>}
+        <Button type="submit" variant="secondary" icon={Save} loading={busy} disabled={!dirty}>Save</Button>
+      </div>
+    </form>
+  )
+}
+
 export default function Settings() {
   const { shop, shops, shopId, setShopId, setState, onCreated } = useVendor()
   const { theme, setTheme } = useTheme()
   const toast = useToast()
-  const [avg, setAvg] = useState(null)
+  const [draft, setDraft] = useState({})
   const [busy, setBusy] = useState(false)
   const [create, setCreate] = useState(false)
   if (!shop) return null
-  const avgValue = avg ?? Math.round(shop.avgServiceMinutes * 10) / 10
 
-  async function patch(body, msg) {
+  async function patch(body, msg, clear) {
     setBusy(true)
-    try { setState(await api(`/api/queues/${shopId}`, { method: 'PATCH', body })); toast.success(msg) } catch (e) { toast.error(e.message) } finally { setBusy(false) }
+    try {
+      setState(await api(`/api/queues/${shopId}`, { method: 'PATCH', body }))
+      if (clear) setDraft((d) => ({ ...d, [clear]: undefined }))
+      toast.success(msg)
+    } catch (e) { toast.error(e.message) } finally { setBusy(false) }
   }
+  const rowProps = { draft, setDraft, save: patch, busy }
 
   return (
     <PageTransition className="stack gap-5" style={{ maxWidth: 760 }}>
@@ -29,10 +49,14 @@ export default function Settings() {
         <h3>Queue</h3>
         <div className="between wrap gap-3"><span className="stack"><b>Accepting customers</b><span className="small muted">Paused queues don't accept new tokens; you can still serve the people already in line.</span></span><Switch checked={shop.isOpen} onChange={(v) => patch({ isOpen: v }, v ? 'Queue opened.' : 'Queue paused.')} label="Queue open" /></div>
         <div className="divider" />
-        <form className="between wrap gap-3" onSubmit={(e) => { e.preventDefault(); patch({ avgServiceMinutes: Number(avgValue) }, 'Average time saved.') }}>
-          <span className="stack"><b>Average minutes per customer</b><span className="small muted">Used for wait estimates. QueueLess also learns this from real service times.</span></span>
-          <div className="row gap-2"><Input type="number" min="0.5" step="0.5" value={avgValue} onChange={(e) => setAvg(e.target.value)} style={{ width: 96 }} aria-label="Average minutes" /><Button type="submit" variant="secondary" icon={Save} loading={busy} disabled={Number(avgValue) === shop.avgServiceMinutes}>Save</Button></div>
-        </form>
+        <NumberRow name="avgServiceMinutes" label="Average minutes per customer" hint="Used for wait estimates. QueueLess also learns this from real service times."
+          saved={Math.round(shop.avgServiceMinutes * 10) / 10} unit="min" min={0.5} step={0.5} msg="Average time saved." {...rowProps} />
+        <div className="divider" />
+        <NumberRow name="counters" label="Counters" hint="How many customers you can serve at once. Each counter calls its own token, and waits are divided between them."
+          saved={shop.counters || 1} unit={(shop.counters || 1) === 1 ? 'desk' : 'desks'} min={1} max={20} msg="Counters updated." {...rowProps} />
+        <div className="divider" />
+        <NumberRow name="graceMinutes" label="No-show grace period" hint="How long a called customer has to reach the counter before they're skipped automatically. Set 0 to turn it off and skip by hand."
+          saved={shop.graceMinutes || 0} unit="min" min={0} max={60} msg="Grace period updated." {...rowProps} />
       </section>
       <section className="card stack gap-4">
         <h3>Workspace</h3>

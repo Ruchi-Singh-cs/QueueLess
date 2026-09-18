@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Search, MapPin, ChevronUp, X, Clock, ArrowRight } from 'lucide-react'
 import { useFetch, useQueueWatch, applyUpdate, useDebounced, useMedia } from '../lib/hooks.js'
-import { useGeolocation } from '../lib/geo.js'
+import { useGeolocation, isCoarse, fmtAccuracy } from '../lib/geo.js'
 import { CATEGORIES, category, fmtKm, fmtMin } from '../lib/format.js'
 import { Button, Chip, Segmented, Select, SkeletonCard, EmptyState, ErrorState, Badge, LiveDot, PageTransition, stagger, cx } from '../ui/index.jsx'
 import { ShopCard } from '../components/Cards.jsx'
@@ -78,7 +78,14 @@ export default function Nearby() {
         <div className="between wrap gap-3">
           <div>
             <h1>Find nearby services</h1>
-            <button type="button" className="loc-line" onClick={geo.clear}><MapPin aria-hidden />{geo.status === 'manual' ? loc.label : 'Using your current location'}<span className="xs faint">· change</span></button>
+            <button type="button" className="loc-line" onClick={geo.clear}>
+              <MapPin aria-hidden />
+              {geo.status === 'manual' ? loc.label : 'Using your current location'}
+              {/* a Wi-Fi or IP fix can be kilometres out — show it rather than pretending the pin is exact */}
+              {loc?.accuracy && <span className={cx('xs', isCoarse(loc) ? 'warn-text' : 'faint')}>{fmtAccuracy(loc.accuracy)}</span>}
+              <span className="xs faint">· change</span>
+            </button>
+            {isCoarse(loc) && <p className="xs faint mt-1" style={{ maxWidth: 460 }}>That's your browser's best guess from Wi-Fi or your IP address — laptops without GPS are often off by a few kilometres. Tap <b>change</b> to drop a pin exactly where you are.</p>}
           </div>
           <div className="input-wrap nearby-search"><Search aria-hidden /><input type="search" className="input" placeholder="Search clinics, salons, banks…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search nearby services" /></div>
         </div>

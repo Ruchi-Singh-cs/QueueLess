@@ -2,9 +2,15 @@ import { useCallback, useState } from 'react'
 
 const KEY = 'queueless.location'
 // Default map center when the user has no location yet (matches the seed data)
-export const DEFAULT_CENTER = { lat: 26.4499, lng: 80.3319 }
+export const DEFAULT_CENTER = { lat: 26.8444, lng: 80.8590 } // Lucknow — where the demo data is seeded
 
 export const readSavedLocation = () => { try { return JSON.parse(localStorage.getItem(KEY)) } catch { return null } }
+
+// Browsers report how good a fix is. Without GPS (most laptops) they locate you from Wi-Fi or your IP,
+// which is routinely kilometres out — so anything looser than this we call approximate and offer to correct.
+export const COARSE_METRES = 750
+export const isCoarse = (loc) => !!loc?.accuracy && loc.accuracy > COARSE_METRES
+export const fmtAccuracy = (m) => (m >= 1000 ? `±${(m / 1000).toFixed(m < 10000 ? 1 : 0)} km` : `±${Math.round(m)} m`)
 export const saveLocation = (loc) => { try { loc ? localStorage.setItem(KEY, JSON.stringify(loc)) : localStorage.removeItem(KEY) } catch {} }
 
 /**
@@ -14,18 +20,21 @@ export const saveLocation = (loc) => { try { loc ? localStorage.setItem(KEY, JSO
 export function useGeolocation() {
   const saved = readSavedLocation()
   const [status, setStatus] = useState(saved ? saved.manual ? 'manual' : 'granted' : 'idle')
-  const [location, setLocation] = useState(saved ? { lat: saved.lat, lng: saved.lng, label: saved.label } : null)
+  const [location, setLocation] = useState(saved ? { lat: saved.lat, lng: saved.lng, label: saved.label, accuracy: saved.accuracy } : null)
 
   const request = useCallback(() => {
     if (!('geolocation' in navigator)) return setStatus('denied')
     setStatus('loading')
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude, label: 'Your current location' }
+        // accuracy is the radius in metres the browser is confident about — keep it, the UI needs to be honest
+        const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: Math.round(pos.coords.accuracy), label: 'Your current location' }
         setLocation(loc); saveLocation(loc); setStatus('granted')
       },
       () => setStatus('denied'),
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
+      // maximumAge 0: never hand back a cached fix from a previous session, which is a common source of
+      // "it put me in the wrong place". A longer timeout gives a real GPS fix time to arrive.
+      { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 },
     )
   }, [])
 

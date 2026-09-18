@@ -10,6 +10,8 @@ import queueRoutes from './routes/queues.js';
 import tokenRoutes from './routes/tokens.js';
 import appointmentRoutes from './routes/appointments.js';
 import adminRoutes from './routes/admin.js';
+import pushRoutes from './routes/push.js';
+import { startGraceSweeper } from './queue.js';
 
 export const app = express();
 export const server = createServer(app);
@@ -23,6 +25,7 @@ app.use('/api/shops', queueRoutes); // alias: a shop is a queue
 app.use('/api/tokens', tokenRoutes);
 app.use('/api/appointments', appointmentRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/push', pushRoutes);
 app.use('/api', (req, res) => res.status(404).json({ error: 'not found' }));
 
 const dist = fileURLToPath(new URL('../../client/dist', import.meta.url));
@@ -53,6 +56,8 @@ io.use((socket, next) => {
     next(new Error('unauthorized'));
   }
 });
+
+if (process.env.NODE_ENV !== 'test') startGraceSweeper(io);
 
 io.on('connection', (socket) => {
   if (socket.user) socket.join(`user:${socket.user.id}`);

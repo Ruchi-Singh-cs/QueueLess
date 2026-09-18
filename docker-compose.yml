@@ -1,0 +1,53 @@
+# Everything QueueLess needs, in one command:
+#
+#   docker compose up --build     →  http://localhost:4000
+#
+# First start seeds the demo data and stages the walkthrough in DEMO.md.
+# Logins are printed in the app logs; the password is "password".
+
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      # the app must not start before mongo is actually answering, or the first
+      # connection attempt fails and the container exits
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      mongo:
+        condition: service_healthy
+    ports:
+      - "${PORT:-4000}:4000"
+    environment:
+      PORT: 4000
+      MONGO_URI: mongodb://mongo:27017/queueless
+      # Override these for anything beyond a local demo.
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@example.com}
+      # Blank by default: the app detects that and simply reports push as unavailable.
+      # Generate a pair with `docker compose run --rm app node vapid.js`, then put them in a .env
+      # beside this file so subscriptions survive a restart.
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:admin@example.com}
+      # New businesses normally wait for an admin to verify them; the demo seeds its own
+      # pending shop to show that flow, so leave this unset.
+      AUTO_APPROVE_SHOPS: ${AUTO_APPROVE_SHOPS:-}
+    # demo.js is idempotent: it leaves the 22 seeded shops alone and rebuilds only the
+    # walkthrough clinic, so a restart always gives you a fresh stage.
+    # exec hands the process to node so tini signals it directly. If staging ever fails the server
+    # still comes up, rather than the container restarting forever with nothing served.
+    command: sh -c "node demo.js || echo 'demo staging failed - starting anyway'; exec node src/index.js"
+
+volumes:
+  mongo-data:

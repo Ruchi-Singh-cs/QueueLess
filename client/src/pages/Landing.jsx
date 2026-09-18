@@ -1,14 +1,57 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { motion, useInView, useReducedMotion } from 'framer-motion'
+import { motion, useInView, useReducedMotion, useScroll, useTransform } from 'framer-motion'
 import { ArrowRight, MapPin, Bell, Users, Clock, Search, ListOrdered, Radar, Footprints, Store, BarChart3, ShieldCheck, Zap, CalendarDays } from 'lucide-react'
 import { api } from '../api.js'
 import { useAuth } from '../auth.jsx'
 import { readSavedLocation, haversineKm, DEFAULT_CENTER } from '../lib/geo.js'
+import { withGsap } from '../lib/gsap.js'
 import { roleHome } from '../lib/format.js'
-import { Button, Badge, LiveDot, AnimatedNumber, stagger, fadeUp } from '../ui/index.jsx'
+import { Button, Badge, LiveDot, AnimatedNumber, Reveal, stagger, fadeUp } from '../ui/index.jsx'
 import { ShopCard } from '../components/Cards.jsx'
 import { GoogleMap } from '../components/Map.jsx'
+
+/* Headline that assembles itself a word at a time. */
+function Headline({ text }) {
+  const reduce = useReducedMotion()
+  if (reduce) return <motion.h1 variants={fadeUp}>{text}</motion.h1>
+  return (
+    <motion.h1 variants={{ hidden: {}, show: { transition: { staggerChildren: 0.08, delayChildren: 0.1 } } }} style={{ perspective: 600 }}>
+      {text.split(' ').map((w, i) => (
+        <motion.span key={i} className="hero-word"
+          variants={{ hidden: { opacity: 0, y: '0.5em', rotateX: -40 }, show: { opacity: 1, y: 0, rotateX: 0, transition: { duration: 0.55, ease: [0.2, 0.8, 0.2, 1] } } }}>
+          {i ? ' ' + w : w}
+        </motion.span>
+      ))}
+    </motion.h1>
+  )
+}
+
+/* Real numbers, counted up as the strip scrolls in — nothing here is invented. */
+function LiveStrip() {
+  const [s, setS] = useState(null)
+  useEffect(() => {
+    api('/api/queues')
+      .then((d) => setS({
+        shops: d.queues.length,
+        waiting: d.queues.reduce((a, q) => a + (q.waitingCount || 0), 0),
+        services: d.queues.reduce((a, q) => a + (q.services?.length || 0), 0),
+      }))
+      .catch(() => setS(null))
+  }, [])
+  if (!s) return null
+  const items = [[s.shops, 'businesses listed'], [s.waiting, 'people in a queue right now'], [s.services, 'services you can book']]
+  return (
+    <motion.ul className="live-strip" initial="hidden" whileInView="show" viewport={{ once: true, margin: '-40px' }} variants={stagger}>
+      {items.map(([v, label]) => (
+        <motion.li key={label} variants={fadeUp}>
+          <span className="live-strip-num num gradient-text"><AnimatedNumber value={v} /></span>
+          <span className="xs muted">{label}</span>
+        </motion.li>
+      ))}
+    </motion.ul>
+  )
+}
 
 /* ---------- Hero product mockup: a live-feeling QueueLess screen ---------- */
 function ProductMock() {
@@ -62,7 +105,8 @@ function Step({ s, i }) {
     <motion.li ref={ref} className="how-step" initial={{ opacity: 0, y: 20 }} animate={inView ? { opacity: 1, y: 0 } : undefined} transition={{ duration: 0.45, delay: 0.05, ease: [0.2, 0.8, 0.2, 1] }}>
       <div className="how-rail">
         <span className="how-num">{s.n}</span>
-        {i < STEPS.length - 1 && <motion.span className="how-line" initial={{ scaleY: 0 }} animate={inView ? { scaleY: 1 } : undefined} transition={{ duration: 0.6, delay: 0.3 }} />}
+        {/* scaleY is driven by GSAP ScrollTrigger below, not by Framer, so the two never fight */}
+        {i < STEPS.length - 1 && <span className="how-line" />}
       </div>
       <div className="how-body">
         <span className="icon-box"><s.icon aria-hidden /></span>
@@ -70,6 +114,22 @@ function Step({ s, i }) {
       </div>
     </motion.li>
   )
+}
+
+/**
+ * Welds the timeline rail to the scroll wheel: each connector fills exactly as far as you have
+ * scrolled past its step, and unfills if you scroll back. That two-way tie to scroll position is
+ * what GSAP's scrub gives us and Framer's viewport triggers cannot.
+ */
+function useScrollRail(ref) {
+  useEffect(() => withGsap(({ gsap }) => {
+    gsap.utils.toArray('.how-line').forEach((line) => {
+      gsap.fromTo(line, { scaleY: 0 }, {
+        scaleY: 1, ease: 'none',
+        scrollTrigger: { trigger: line, start: 'top 85%', end: 'bottom 55%', scrub: 0.4 },
+      })
+    })
+  }, ref.current), [ref])
 }
 
 /* ---------- Nearby preview ---------- */
@@ -99,19 +159,31 @@ function NearbyPreview() {
 
 export default function Landing() {
   const { user } = useAuth()
+  const reduce = useReducedMotion()
+  const howRef = useRef(null)
+  useScrollRail(howRef)
+  const heroRef = useRef(null)
+  const { scrollYProgress } = useScroll({ target: heroRef, offset: ['start start', 'end start'] })
+  // subtle depth: the mock lifts and tips away slightly faster than the copy
+  const mockY = useTransform(scrollYProgress, [0, 1], [0, -70])
+  const mockRotate = useTransform(scrollYProgress, [0, 1], [0, -4])
+  const copyY = useTransform(scrollYProgress, [0, 1], [0, 40])
+  const heroFade = useTransform(scrollYProgress, [0, 0.85], [1, 0])
+  const par = (v) => (reduce ? undefined : v)
   return (
     <>
       {/* HERO */}
-      <section className="hero">
+      <section className="hero" ref={heroRef}>
         <div className="hero-bg bg-grid" aria-hidden />
+        <div className="hero-glow" aria-hidden />
         <div className="container hero-grid">
-          <motion.div className="hero-copy" initial="hidden" animate="show" variants={stagger}>
+          <motion.div className="hero-copy" initial="hidden" animate="show" variants={stagger} style={{ y: par(copyY), opacity: par(heroFade) }}>
             <motion.div variants={fadeUp}><Badge tone="primary" size="lg"><LiveDot />Real-time virtual queues</Badge></motion.div>
-            <motion.h1 variants={fadeUp}>Skip the wait.</motion.h1>
+            <Headline text="Skip the wait." />
             <motion.p variants={fadeUp} className="hero-sub">Join the queue virtually. Know your turn. Arrive when it matters.</motion.p>
             <motion.div variants={fadeUp} className="hero-cta">
-              <Button variant="primary" size="lg" to={user ? roleHome(user.role) : '/nearby'} icon={MapPin}>Find a Queue</Button>
-              <Button variant="secondary" size="lg" href="#business">For Businesses</Button>
+              <Button variant="primary" size="lg" magnetic to={user ? roleHome(user.role) : '/nearby'} icon={MapPin}>Find a Queue</Button>
+              <Button variant="secondary" size="lg" magnetic href="#business">For Businesses</Button>
             </motion.div>
             <motion.ul variants={fadeUp} className="hero-proof">
               <li><Zap aria-hidden />Token in seconds</li>
@@ -119,32 +191,34 @@ export default function Landing() {
               <li><Bell aria-hidden />Notified when it's near</li>
             </motion.ul>
           </motion.div>
-          <motion.div className="hero-visual" initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.2, ease: [0.2, 0.8, 0.2, 1] }}>
+          <motion.div className="hero-visual" initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.2, ease: [0.2, 0.8, 0.2, 1] }}
+            style={{ y: par(mockY), rotate: par(mockRotate) }}>
             <ProductMock />
           </motion.div>
         </div>
+        <div className="container"><LiveStrip /></div>
       </section>
 
       {/* HOW IT WORKS */}
       <section className="section" id="how">
         <div className="container">
-          <div className="section-head">
+          <Reveal className="section-head">
             <span className="eyebrow">How QueueLess works</span>
             <h2>Join remotely. Track live. Arrive when it matters.</h2>
             <p>Five steps between you and never sitting in a waiting room again.</p>
-          </div>
-          <ol className="how">{STEPS.map((s, i) => <Step key={s.n} s={s} i={i} />)}</ol>
+          </Reveal>
+          <ol className="how" ref={howRef}>{STEPS.map((s, i) => <Step key={s.n} s={s} i={i} />)}</ol>
         </div>
       </section>
 
       {/* NEARBY */}
       <section className="section section-alt" id="nearby">
         <div className="container">
-          <div className="section-head">
+          <Reveal className="section-head">
             <span className="eyebrow">Nearby</span>
             <h2>Find services near you.</h2>
             <p>Discover nearby clinics, salons, banks, government offices and more — with live queue status before you leave home.</p>
-          </div>
+          </Reveal>
           <NearbyPreview />
         </div>
       </section>
@@ -152,12 +226,12 @@ export default function Landing() {
       {/* FOR BUSINESSES */}
       <section className="section" id="business">
         <div className="container biz">
-          <div className="section-head">
+          <Reveal className="section-head">
             <span className="eyebrow">For businesses</span>
             <h2>A calmer front desk. Happier customers.</h2>
             <p>Run your queue from one screen. Customers join from their phones; you press <b>Next</b>.</p>
-            <div className="row gap-2 wrap mt-5"><Button variant="primary" size="lg" to="/register?role=staff">Register your business<ArrowRight aria-hidden /></Button><Button variant="ghost" size="lg" to="/login">Vendor login</Button></div>
-          </div>
+            <div className="row gap-2 wrap mt-5"><Button variant="primary" size="lg" magnetic to="/register?role=staff">Register your business<ArrowRight aria-hidden /></Button><Button variant="ghost" size="lg" to="/login">Vendor login</Button></div>
+          </Reveal>
           <motion.ul className="biz-grid" variants={stagger} initial="hidden" whileInView="show" viewport={{ once: true, margin: '-60px' }}>
             {[[Store, 'Shop profile & map pin', 'Show up on the map with hours, services and directions.'], [ListOrdered, 'One-tap queue control', 'Next, skip, complete, pause — built for a busy counter.'], [CalendarDays, 'Appointments', 'Bookings check in as priority tokens automatically.'], [BarChart3, 'Analytics', 'Served today, average wait, busiest hours.'], [ShieldCheck, 'Role-based access', 'Vendors manage only their own shop. Admins see everything.'], [Bell, 'Automatic notifications', 'Customers are told when to return — you never shout a number again.']].map(([Icon, t, d]) => (
               <motion.li key={t} variants={fadeUp} className="card card-hover"><span className="icon-box"><Icon aria-hidden /></span><h3 className="mt-3">{t}</h3><p className="muted small mt-2">{d}</p></motion.li>
@@ -169,10 +243,10 @@ export default function Landing() {
       {/* CTA */}
       <section className="section">
         <div className="container">
-          <div className="cta-band">
+          <motion.div className="cta-band" initial={{ opacity: 0, y: 28, scale: 0.98 }} whileInView={{ opacity: 1, y: 0, scale: 1 }} viewport={{ once: true, margin: '-80px' }} transition={{ duration: 0.6, ease: [0.2, 0.8, 0.2, 1] }}>
             <div><h2>Your time is yours again.</h2><p>Find a queue near you and take a token in seconds.</p></div>
-            <Button variant="primary" size="lg" to={user ? roleHome(user.role) : '/register'}>{user ? 'Go to my dashboard' : 'Get Started'}<ArrowRight aria-hidden /></Button>
-          </div>
+            <Button variant="primary" size="lg" magnetic to={user ? roleHome(user.role) : '/register'}>{user ? 'Go to my dashboard' : 'Get Started'}<ArrowRight aria-hidden /></Button>
+          </motion.div>
         </div>
       </section>
     </>

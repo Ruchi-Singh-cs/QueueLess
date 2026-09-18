@@ -12,7 +12,32 @@ Currently serving: #21   Your token: #27   People ahead: 6   ETA: 35 min
 - **server/** — Node 20+, Express 5, Mongoose 8 (2dsphere geo queries), Socket.IO 4, JWT, bcryptjs. ESM. No `dotenv` (`node --env-file`). Vite proxy in dev; Express serves `client/dist` in prod (same origin).
 - **client/** — Vite + React 18, react-router 6, framer-motion, lucide-react (single icon set), socket.io-client, maps via OpenStreetMap/Leaflet (default, free) or Google Maps JavaScript API (Places + Marker) when a key is set. Plain CSS design system (`src/styles/`), light + dark mode.
 
-## Run
+## Run with Docker
+
+Nothing to install but Docker itself — no Node, no MongoDB, no `.env` to fill in:
+
+```bash
+docker compose up --build     # http://localhost:4000
+```
+
+One image serves the API, the WebSocket and the built front end on a single port; MongoDB runs
+beside it with a named volume, so your data survives `docker compose down`. The first start seeds
+the demo shops and stages the walkthrough in [DEMO.md](DEMO.md) — log in with any account listed
+there, password `password`.
+
+```bash
+docker compose down           # stop (data kept)
+docker compose down -v        # stop and wipe the database
+docker compose exec app node demo.js    # re-stage the demo without restarting
+docker compose run --rm app node vapid.js   # generate VAPID keys for push
+```
+
+Notifications are off until you set VAPID keys: generate a pair with the command above, put them in
+a `.env` next to `docker-compose.yml` as `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY`, then
+`docker compose up -d`. Without them the app runs fine and simply reports push as unavailable.
+`JWT_SECRET` defaults to a placeholder — override it for anything beyond a local demo.
+
+## Run without Docker
 
 ```bash
 # 1. server (embedded MongoDB persists in server/data — no install needed)

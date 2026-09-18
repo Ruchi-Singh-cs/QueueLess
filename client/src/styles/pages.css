@@ -267,6 +267,10 @@ button.service-card:hover { border-color: var(--text-3); }
 .loc-prompt .icon-box svg { width: 26px; height: 26px; }
 .loc-prompt h3 { font-size: 1.375rem; letter-spacing: -.02em; margin-bottom: var(--s-2); }
 .loc-prompt p { max-width: 380px; }
+/* the map picker needs the full width, unlike the centred permission card */
+.loc-prompt-wide { align-items: stretch; text-align: left; padding: var(--s-6); }
+.loc-prompt-wide p { max-width: none; }
+.warn-text { color: var(--warning); font-weight: 600; }
 
 /* ===================== Search palette ===================== */
 .palette { width: min(640px, 100%); background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); box-shadow: var(--shadow-lg); overflow: hidden; }
@@ -294,13 +298,16 @@ button.service-card:hover { border-color: var(--text-3); }
 .live-who { display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; min-height: 48px; }
 .live-who b { font-size: 1.125rem; }
 .live-next { font-size: 1.5rem; letter-spacing: .04em; --h: 76px; border-radius: 18px; }
-.live-secondary { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s-2); }
+.live-secondary { display: flex; flex-wrap: wrap; gap: var(--s-2); }
+.live-secondary > * { flex: 1 1 auto; min-width: 0; }
 .live-list { max-height: calc(100dvh - 120px); overflow: auto; }
 .wait-row { display: flex; align-items: center; gap: var(--s-3); padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface); }
 .wait-row.next { border-color: var(--primary); background: var(--primary-soft); }
+/* keep "service · 12 min ago" on one line and shorten the service instead of breaking mid-phrase */
+.wait-meta { flex-wrap: nowrap; min-width: 0; white-space: nowrap; }
 .wait-num { font-weight: 700; font-size: 1.125rem; font-variant-numeric: tabular-nums; letter-spacing: -.02em; width: 56px; flex: none; }
 @media (max-width: 1023px) { .live { grid-template-columns: 1fr; } .live-list { max-height: none; } }
-@media (max-width: 639px) { .live-now { padding: var(--s-5) var(--s-4); } .live-secondary { grid-template-columns: 1fr 1fr; } .live-secondary > :last-child { grid-column: 1 / -1; } }
+@media (max-width: 639px) { .live-now { padding: var(--s-5) var(--s-4); } .live-secondary > * { flex-basis: calc(50% - var(--s-2)); } }
 .dash-menu { display: none; }
 @media (max-width: 1023px) { .side-collapse { display: none; } }
 @media (max-width: 1023px) { .dash-menu { display: inline-flex; } }
@@ -346,3 +353,78 @@ button.service-card:hover { border-color: var(--text-3); }
 .place-results .menu-item { white-space: normal; }
 .map-dark .leaflet-tile-pane { filter: invert(1) hue-rotate(195deg) brightness(.82) contrast(.92) saturate(.55); }
 .map-dark.leaflet-container { background: #0f1522; }
+
+/* ---------- Counter QR ---------- */
+.qr-poster { display: flex; gap: var(--s-5); align-items: flex-start; flex-wrap: wrap; }
+.qr-poster > .stack { flex: 1 1 240px; min-width: 0; }
+/* the white frame is deliberate in both themes — phone cameras need dark-on-light to lock on */
+.qr-frame { background: #fff; padding: var(--s-3); border-radius: var(--r-sm); border: 1px solid var(--border); line-height: 0; flex: none; }
+.qr-canvas { display: block; }
+.qr-link { display: block; font-size: .8rem; color: var(--text-2); background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-sm); padding: 8px 10px; }
+@media (max-width: 560px) { .qr-poster { gap: var(--s-4); } }
+
+/* ---------- Multi-counter live queue ---------- */
+.counter-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(272px, 1fr)); gap: var(--s-4); align-items: stretch; }
+.live-now.tile { padding: var(--s-5); gap: var(--s-3); cursor: pointer; }
+.live-now.tile .live-number { font-size: clamp(3rem, 7vw, 4.75rem); padding: var(--s-2) 0; }
+.live-now.tile .live-who { min-height: 62px; }
+.live-now.tile .live-who b { font-size: 1rem; }
+.live-now.tile .live-next { font-size: 1rem; --h: 52px; border-radius: 14px; }
+/* which counter the N / S / C keys drive */
+.live-now.active { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
+.grace { display: inline-flex; align-items: center; gap: 6px; font-size: .75rem; font-weight: 600; color: var(--text-2); white-space: nowrap; }
+/* the counter label must never wrap behind the status chip next to it */
+.live-now .eyebrow { white-space: nowrap; }
+.grace svg { width: 14px; height: 14px; }
+.grace.ok { color: var(--success); }
+.grace.soon { color: var(--warning); }
+.grace.over { color: var(--danger); }
+@media (max-width: 639px) { .counter-grid { grid-template-columns: 1fr; } }
+
+/* ---------- Busy-times heatmap ---------- */
+.heat { margin: 0; }
+.heat-grid { display: grid; grid-template-columns: 34px repeat(24, minmax(0, 1fr)); gap: 3px; align-items: center; }
+.heat-day, .heat-hour { font-size: .65rem; color: var(--text-3); line-height: 1; }
+.heat-hour { text-align: center; }
+.heat-cell { aspect-ratio: 1; border-radius: 3px; min-height: 12px; background: color-mix(in srgb, var(--primary) calc(var(--v) * 88%), var(--surface-2)); }
+.heat-legend { display: flex; align-items: center; gap: var(--s-2); margin-top: var(--s-3); }
+.heat-scale { flex: none; width: 72px; height: 8px; border-radius: var(--r-pill); background: linear-gradient(90deg, var(--surface-2), var(--primary)); }
+@media (max-width: 639px) { .heat-grid { grid-template-columns: 28px repeat(24, minmax(0, 1fr)); gap: 2px; } .heat-cell { min-height: 8px; } }
+
+/* ===================== Landing motion ===================== */
+/* each word animates as its own block; the space is a real non-breaking character inside the span,
+   so the heading still reads and copies as "Skip the wait." */
+.hero-word { display: inline-block; transform-origin: 50% 100%; white-space: pre; }
+
+/* a slow drift behind the hero — large, low-contrast, never competing with the copy */
+.hero-glow { position: absolute; inset: -20% -10% auto -10%; height: 130%; z-index: 0; pointer-events: none; filter: blur(60px); opacity: .55; }
+.hero-glow::before, .hero-glow::after { content: ''; position: absolute; border-radius: 50%; }
+.hero-glow::before { width: 46vw; height: 46vw; left: 8%; top: 4%; background: radial-gradient(circle, rgba(47, 107, 255, .32), transparent 70%); animation: drift-a 22s ease-in-out infinite; }
+.hero-glow::after { width: 38vw; height: 38vw; right: 6%; top: 18%; background: radial-gradient(circle, rgba(109, 92, 255, .26), transparent 70%); animation: drift-b 28s ease-in-out infinite; }
+@keyframes drift-a { 0%, 100% { transform: translate3d(0, 0, 0) scale(1); } 50% { transform: translate3d(6%, 8%, 0) scale(1.12); } }
+@keyframes drift-b { 0%, 100% { transform: translate3d(0, 0, 0) scale(1); } 50% { transform: translate3d(-7%, 6%, 0) scale(1.08); } }
+
+/* live counts under the hero */
+.live-strip { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: var(--s-6); list-style: none; padding: var(--s-6) 0 0; margin: var(--s-7) 0 0; border-top: 1px solid var(--border); }
+.live-strip li { display: flex; flex-direction: column; gap: 2px; }
+.live-strip-num { font-size: clamp(1.5rem, 3.5vw, 2.25rem); font-weight: 800; letter-spacing: -.03em; line-height: 1; }
+@media (max-width: 639px) { .live-strip { gap: var(--s-5); } }
+
+/* ===================== Live feel ===================== */
+/* "it's your turn" earns a soft breathing ring — it is the one moment that matters */
+.ticket-main.is-serving { animation: turn-glow 2.4s ease-in-out infinite; }
+@keyframes turn-glow {
+  0%, 100% { box-shadow: 0 0 0 1px var(--success), 0 0 0 0 color-mix(in srgb, var(--success) 40%, transparent); }
+  50%      { box-shadow: 0 0 0 1px var(--success), 0 0 0 10px color-mix(in srgb, var(--success) 0%, transparent); }
+}
+/* the counter a shop is about to act on */
+.live-now.active .live-number { animation: num-breathe 3s ease-in-out infinite; }
+@keyframes num-breathe { 0%, 100% { opacity: 1; } 50% { opacity: .86; } }
+
+/* ===================== Micro-interactions ===================== */
+.btn { transition: background .15s ease, border-color .15s ease, color .15s ease, box-shadow .2s ease, transform .12s cubic-bezier(.2,.8,.2,1); }
+.btn-primary:hover:not(:disabled) { transform: translateY(-1px); }
+.btn:active:not(:disabled) { transform: scale(.97); }
+.card { transition: border-color .2s ease, box-shadow .25s ease, transform .25s cubic-bezier(.2,.8,.2,1); }
+.wait-row { transition: border-color .2s ease, background .2s ease, transform .2s cubic-bezier(.2,.8,.2,1); }
+.wait-row:hover { transform: translateX(2px); }

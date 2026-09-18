@@ -2,10 +2,11 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState } from 
 import { useAuth } from '../auth.jsx'
 import { useTicketUpdates } from './hooks.js'
 import { useToast } from '../ui/Toast.jsx'
+import { pushState, resyncPush, pushSupported } from './push.js'
 
 // ponytail: notifications are derived client-side from ticket:update events and kept in localStorage;
 // add a Notification model + endpoint if they must survive across devices.
-const Ctx = createContext({ items: [], unread: 0, markAllRead: () => {}, clear: () => {} })
+const Ctx = createContext({ items: [], unread: 0, markAllRead: () => {}, clear: () => {}, pushOn: false, refreshPush: () => {} })
 
 // Android Chrome throws on `new Notification` (needs a service worker) – ignore, the in-app center is the source of truth
 const osNotify = (title, body) => { try { if (typeof Notification !== 'undefined' && Notification.permission === 'granted') new Notification(title, { body, icon: '/favicon.svg' }) } catch {} }
@@ -19,6 +20,23 @@ export function NotificationsProvider({ children }) {
   const items = store.items
   const setItems = (fn) => setStore((s) => ({ ...s, items: typeof fn === 'function' ? fn(s.items) : fn }))
   const last = useRef(new Map()) // tokenId -> last ticket seen
+  // when this device has a push subscription the service worker shows the OS notifications (including
+  // for a backgrounded tab), so the in-page path must stand down or every alert arrives twice
+  const [pushOn, setPushOn] = useState(false)
+  const pushOnRef = useRef(false)
+  pushOnRef.current = pushOn
+  const refreshPush = useMemo(() => () => pushState().then((s) => setPushOn(s === 'on')).catch(() => {}), [])
+
+  useEffect(() => {
+    if (!user) { setPushOn(false); return }
+    let alive = true
+    // rebinds the subscription to whoever just logged in, and heals one the browser rotated
+    resyncPush().then((ok) => { if (alive) setPushOn(ok) })
+    if (!pushSupported()) return () => { alive = false }
+    const onMessage = (e) => { if (e.data?.type === 'push-subscription-changed') resyncPush().then((ok) => alive && setPushOn(ok)) }
+    navigator.serviceWorker.addEventListener('message', onMessage)
+    return () => { alive = false; navigator.serviceWorker.removeEventListener('message', onMessage) }
+  }, [user?._id])
 
   useEffect(() => {
     let loaded = []
@@ -35,7 +53,7 @@ export function NotificationsProvider({ children }) {
     const push = (kind, title, body, tone = 'info') => {
       setItems((xs) => [{ id: `${t._id}:${kind}:${Date.now()}`, kind, title, body, tone, at: new Date().toISOString(), tokenId: t._id, queueId: t.queue._id, read: false }, ...xs])
       toast.info(title, { description: body })
-      osNotify(title, body)
+      if (!pushOnRef.current) osNotify(title, body)
     }
     const shop = t.queue.name
     const fresh = !prev && Date.now() - new Date(t.createdAt) < 15000
@@ -52,8 +70,10 @@ export function NotificationsProvider({ children }) {
     unread: items.filter((x) => !x.read).length,
     markAllRead: () => setItems((xs) => xs.map((x) => ({ ...x, read: true }))),
     clear: () => setItems([]),
+    pushOn,
+    refreshPush,
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [items])
+  }), [items, pushOn, refreshPush])
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }
 

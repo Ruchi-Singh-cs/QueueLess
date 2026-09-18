@@ -7,6 +7,7 @@ import { NotificationsProvider } from './lib/notifications.jsx'
 import { roleHome } from './lib/format.js'
 import { PublicLayout, DashboardLayout, VENDOR_NAV, ADMIN_NAV } from './components/Layout.jsx'
 import { Skeleton } from './ui/index.jsx'
+import { CursorGlow } from './components/CursorGlow.jsx'
 import Landing from './pages/Landing.jsx'
 import Login from './pages/Login.jsx'
 
@@ -62,6 +63,7 @@ export default function App() {
           <BrowserRouter>
             <NotificationsProvider>
               <ScrollToTop />
+              <CursorGlow />
               <Suspense fallback={<Fallback />}>
                 <Routes>
                   <Route element={<PublicLayout />}>
