@@ -101,11 +101,7 @@ export function Avatar({ name = '?', size, className }) {
   const initials = name.split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase()).join('')
   return <span className={cx('avatar', size && `avatar-${size}`, className)} aria-hidden>{initials}</span>
 }
-/**
- * The mark: a progress ring stopped just short of closing — the moment before your turn — whose gap
- * and tail read as a Q. The dot at the centre is your token. Drawn rather than borrowed from an icon
- * set so it stays ours and stays legible at favicon size.
- */
+/** The mark: a progress ring stopped just short of closing, read as a Q; the dot is your token. */
 export const LogoMark = ({ className }) => (
   <svg viewBox="0 0 24 24" className={cx('logo-glyph', className)} fill="none" aria-hidden
     stroke="currentColor" strokeWidth="3" strokeLinecap="round">
@@ -240,10 +236,7 @@ export function PageTransition({ children, className, style }) {
   )
 }
 
-/**
- * Reveals its children when they scroll into view. One place to change how the whole site enters,
- * and it degrades to a plain wrapper under reduced motion rather than leaving content hidden.
- */
+/** Scroll-triggered reveal. Renders a plain element under reduced motion so content is never left hidden. */
 export function Reveal({ children, as = 'div', delay = 0, y = 18, className, style, stagger: st }) {
   const reduce = useReducedMotion()
   const M = motion[as] || motion.div

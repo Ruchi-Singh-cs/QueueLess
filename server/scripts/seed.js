@@ -2,7 +2,7 @@
 // Run: npm run seed            (same MONGO_URI / embedded db as the server; idempotent — shops are matched by name)
 //      npm run seed -- 28.6139 77.2090   (drop the demo city somewhere else: <lat> <lng>)
 import bcrypt from 'bcryptjs';
-import { User, Queue, Token, Appointment } from './src/models.js';
+import { User, Queue, Token, Appointment } from '../src/models.js';
 
 const argLat = Number(process.argv[2]), argLng = Number(process.argv[3]);
 const CENTER = Number.isFinite(argLat) && Number.isFinite(argLng) ? { lat: argLat, lng: argLng }
@@ -163,7 +163,7 @@ export async function seed() {
 }
 
 if (process.argv[1] && import.meta.url.endsWith(process.argv[1].replace(/\\/g, '/').split('/').pop())) {
-  const { connectDb } = await import('./src/db.js');
+  const { connectDb } = await import('../src/db.js');
   const stop = await connectDb();
   const out = await seed();
   console.log(`Seeded around ${CENTER.lat}, ${CENTER.lng}. ${out.total} shops in the database (${out.created.length} new).\nLogin with password "${PASSWORD}":\n  admin    ${out.admin}\n  customer ${out.customer}\n  vendors  <shop-name>@example.com (e.g. dr-sharma-clinic@example.com, passport-seva-kendra@example.com)`);

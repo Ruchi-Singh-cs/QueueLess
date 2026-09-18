@@ -14,9 +14,7 @@ export async function connectDb() {
   let uri = process.env.MONGO_URI;
   let mongo;
   if (!uri) {
-    // ponytail: no MONGO_URI -> embedded mongod persisting to ./data; set MONGO_URI to use a real server
-    // It is a devDependency, so a production install (Docker) does not have it. Say so plainly rather
-    // than dying with ERR_MODULE_NOT_FOUND.
+    // no MONGO_URI -> embedded mongod in ./data. It is a devDependency, absent from production installs.
     let MongoMemoryServer;
     try {
       ({ MongoMemoryServer } = await import('mongodb-memory-server'));
@@ -26,10 +24,7 @@ export async function connectDb() {
     const dbPath = fileURLToPath(new URL('../data', import.meta.url));
     mkdirSync(dbPath, { recursive: true });
 
-    // Windows holds an exclusive handle on mongod.lock while a server is running, so opening it for
-    // writing tells us the answer before we spawn anything. Worth doing up front: when the directory
-    // is busy, mongodb-memory-server sometimes dies inside its own stdout parser (a JSON.parse on a
-    // chunk holding two log lines) rather than rejecting, and that throw lands outside any catch here.
+    // Windows holds mongod.lock exclusively while a server runs; check before spawning, because a busy dir can crash mongodb-memory-server outside any catch
     const lockFile = fileURLToPath(new URL('../data/mongod.lock', import.meta.url));
     if (existsSync(lockFile)) {
       try {
@@ -42,18 +37,13 @@ export async function connectDb() {
     try {
       mongo = await MongoMemoryServer.create({ instance: { dbPath, storageEngine: 'wiredTiger' } });
     } catch (err) {
-      // Only one process can hold ./data. Hitting this usually means a server is already running in
-      // another terminal, or `npm run seed`/`npm run demo` is mid-flight. mongod's own message is a
-      // wall of stack trace that says none of that.
-      // belt and braces for platforms where the lock is advisory and the pre-flight check cannot see it
+      // fallback for platforms with advisory locks, where the pre-flight check cannot see the conflict
       if (!/DBPathInUse|lock file/i.test(String(err?.message))) throw err;
       throw new Error(IN_USE);
     }
     uri = mongo.getUri();
   }
-  // The embedded mongod is killed when a short script exits, and WiredTiger only checkpoints
-  // periodically — so the last writes of `npm run seed`/`npm run demo` were being lost. Journaling
-  // every write makes them survive the kill (and replay from ./data on the next start).
+  // journal every write: the embedded mongod is killed when a short script exits, before WiredTiger checkpoints
   const opts = mongo ? { writeConcern: { w: 1, j: true } } : {};
   try {
     await mongoose.connect(uri, opts);

@@ -13,10 +13,7 @@ export const isCoarse = (loc) => !!loc?.accuracy && loc.accuracy > COARSE_METRES
 export const fmtAccuracy = (m) => (m >= 1000 ? `±${(m / 1000).toFixed(m < 10000 ? 1 : 0)} km` : `±${Math.round(m)} m`)
 export const saveLocation = (loc) => { try { loc ? localStorage.setItem(KEY, JSON.stringify(loc)) : localStorage.removeItem(KEY) } catch {} }
 
-/**
- * Browser geolocation with a clean state machine:
- * status: 'idle' | 'prompt' | 'loading' | 'granted' | 'denied' | 'manual'
- */
+/** Browser geolocation. status: 'idle' | 'loading' | 'granted' | 'denied' | 'manual' */
 export function useGeolocation() {
   const saved = readSavedLocation()
   const [status, setStatus] = useState(saved ? saved.manual ? 'manual' : 'granted' : 'idle')

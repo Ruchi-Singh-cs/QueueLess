@@ -1,9 +1,7 @@
-// Stages the app for a live demo: everything `seed` makes, plus one clinic set up so every feature is
-// visible the moment you open it — two counters mid-service, a no-show timer counting down, a skipped
-// customer waiting to be recalled, a month of history for the charts, and a shop awaiting approval.
-// Run: npm run demo          (same MONGO_URI / embedded db as the server; re-run any time to reset the stage)
+// Stages the live demo: seed + one clinic mid-service, a recallable no-show, history, appointments, a pending shop.
+// npm run demo — re-run any time to reset.
 import bcrypt from 'bcryptjs';
-import { User, Queue, Token, Appointment } from './src/models.js';
+import { User, Queue, Token, Appointment } from '../src/models.js';
 import { seed } from './seed.js';
 
 const STAGE = 'Dr. Sharma Clinic'; // the shop the walkthrough uses
@@ -14,20 +12,14 @@ const DAY = 86400000;
 const user = async (name, email, role) =>
   (await User.findOne({ email })) || User.create({ name, email, role, passwordHash: await bcrypt.hash(PASSWORD, 10) });
 
-/**
- * Create a token with a back-dated createdAt. It has to go through the raw driver: Mongoose treats
- * createdAt as its own and quietly drops it from a $set, leaving every token stamped "now".
- */
+/** Create a token with a back-dated createdAt via the raw driver (Mongoose strips createdAt from $set). */
 async function token(fields, createdAt) {
   const t = await Token.create(fields);
   await Token.collection.updateOne({ _id: t._id }, { $set: { createdAt } });
   return t;
 }
 
-/**
- * A month of finished tokens shaped like a real clinic: busiest Saturday late morning, a second
- * smaller evening rush, dead on Sunday. Gives the heatmap and the 7/30-day charts something true to say.
- */
+/** A month of finished tokens with a realistic weekly/hourly shape for the charts. */
 async function history(queue, people, days = 29) {
   const WEEKDAY_LOAD = [0.15, 0.8, 0.85, 0.9, 0.85, 1, 1.6]; // Sun … Sat
   const HOUR_LOAD = Object.fromEntries([[9, 0.8], [10, 1.4], [11, 1.6], [12, 1], [13, 0.4], [14, 0.6], [15, 0.7], [16, 1], [17, 1.2], [18, 0.9]]);
@@ -57,12 +49,7 @@ async function history(queue, people, days = 29) {
   return docs.length;
 }
 
-/**
- * Tokens already served earlier today. Without these, "Today" — the range Analytics opens on — holds
- * only the handful of tokens staged for the live line, all in whichever hour you happened to run this,
- * so the hourly chart is a single spike. Analytics days are UTC, so everything here is clamped to
- * after UTC midnight; stage within a couple of hours of it and there is simply less to show.
- */
+/** Tokens served earlier today, so Analytics "Today" has a real hourly shape. Clamped to after UTC midnight. */
 async function servedToday(queue, people, startNumber) {
   const midnight = new Date(new Date().toISOString().slice(0, 10)).getTime();
   const now = Date.now();
@@ -93,9 +80,7 @@ export async function demo() {
   const customer = await user('Aarav Customer', 'user@example.com', 'user');
   const now = Date.now();
 
-  // ---- the stage: two counters, and a grace period long enough to survive being talked over ----
-  // (the sweeper auto-skips an un-arrived token once its grace runs out, which quietly advances the
-  // whole queue — 10 minutes leaves a visibly ticking clock without the stage falling apart mid-sentence)
+  // the stage: two counters; 10 min grace keeps the countdown visible without auto-advancing mid-demo
   const shop = await Queue.findOne({ name: STAGE });
   if (!shop) throw new Error(`${STAGE} is missing — run \`npm run seed\` first`);
   Object.assign(shop, { counters: 2, graceMinutes: 10, isOpen: true, status: 'approved' });
@@ -123,9 +108,7 @@ export async function demo() {
   shop.counterDate = new Date().toISOString().slice(0, 10);
   await shop.save();
 
-  // ---- appointments, always in the future ----
-  // seed() creates these once and skips them forever after, so by the next run they have gone stale
-  // and two customer screens sit empty. Re-cut them from now on every staging.
+  // appointments, re-cut from now so they are never in the past
   await Appointment.deleteMany({ user: customer._id, status: 'booked' });
   // one soon enough to sit under Today, the rest at hours a real shop is actually open
   const soon = new Date(now + 2 * 3600e3); soon.setMinutes(30, 0, 0);
@@ -169,7 +152,7 @@ export async function demo() {
 }
 
 if (process.argv[1] && import.meta.url.endsWith(process.argv[1].replace(/\\/g, '/').split('/').pop())) {
-  const { connectDb } = await import('./src/db.js');
+  const { connectDb } = await import('../src/db.js');
   const stop = await connectDb();
   const d = await demo();
   console.log(`

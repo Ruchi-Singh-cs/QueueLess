@@ -116,11 +116,7 @@ function Step({ s, i }) {
   )
 }
 
-/**
- * Welds the timeline rail to the scroll wheel: each connector fills exactly as far as you have
- * scrolled past its step, and unfills if you scroll back. That two-way tie to scroll position is
- * what GSAP's scrub gives us and Framer's viewport triggers cannot.
- */
+/** Scrubs the timeline rail to scroll position — fills as you pass each step, unfills on the way back. */
 function useScrollRail(ref) {
   useEffect(() => withGsap(({ gsap }) => {
     gsap.utils.toArray('.how-line').forEach((line) => {

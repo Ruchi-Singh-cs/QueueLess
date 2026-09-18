@@ -4,10 +4,7 @@ import { Download, Copy, Check } from 'lucide-react'
 import { Button, Alert } from '../ui/index.jsx'
 import { useToast } from '../ui/Toast.jsx'
 
-/**
- * A scannable QR for `value`. Always dark-on-white whatever the theme is — a QR inverted for dark
- * mode is unreadable to most phone cameras, and this one ends up printed and taped to a counter.
- */
+/** Scannable QR. Always dark-on-white: an inverted QR is unreadable to most cameras, and this one gets printed. */
 export function QrCode({ value, size = 190, alt = 'QR code' }) {
   const canvas = useRef(null)
   const [error, setError] = useState('')

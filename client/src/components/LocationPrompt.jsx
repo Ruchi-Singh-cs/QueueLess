@@ -4,11 +4,7 @@ import { Button, cx } from '../ui/index.jsx'
 import { DEFAULT_CENTER } from '../lib/geo.js'
 import { LocationPicker } from './LocationPicker.jsx'
 
-/**
- * Location permission UX. status from useGeolocation. Never blocks: "continue without location" uses a default city center.
- * The manual path is a real map with a draggable pin — asking a customer to type latitude and longitude
- * was never going to get anyone to their exact spot.
- */
+/** Location permission UX. Never blocks; the manual path is a map with a draggable pin. */
 export function LocationPrompt({ status, onAllow, onManual, compact, startManual = false, title, hint }) {
   const [manual, setManual] = useState(startManual)
   const [pin, setPin] = useState(null)

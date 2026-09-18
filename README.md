@@ -13,7 +13,6 @@ All seeded accounts use the password **`password`** unless noted.
 
 | Role | Email | Password | Lands on |
 |---|---|---|---|
-| **Admin** (yours) | `rs9538605@gmail.com` | `ruchi@123` | `/admin` |
 | Admin (seeded) | `admin@example.com` | `password` | `/admin` |
 | Customer | `user@example.com` | `password` | `/queue` — a live ticket |
 | Vendor — demo clinic | `dr-sharma-clinic@example.com` | `password` | `/vendor` — 2 counters mid-service |
@@ -21,7 +20,7 @@ All seeded accounts use the password **`password`** unless noted.
 | Any other vendor | `<shop-name-slug>@example.com` e.g. `glow-salon@example.com`, `city-bank-main-branch@example.com` | `password` | `/vendor` |
 | Other customers | `priya@example.com`, `rahul@example.com`, `neha@example.com` … (first names from the seed) | `password` | `/app` |
 
-Registering with the email in `ADMIN_EMAIL` (`server/.env`) makes that account an admin. Admins can change any user's role at **Admin → Users**.
+Registering with the email set as `ADMIN_EMAIL` in `server/.env` makes that account an admin (your own admin login is whatever you registered there). Admins can change any user's role at **Admin → Users**.
 
 > These are demo credentials for a local database. Change `JWT_SECRET` and the admin password before exposing the app anywhere public.
 
@@ -38,8 +37,8 @@ One image serves the API, WebSocket and the built front end on a single port; Mo
 ```bash
 docker compose down              # stop, keep data
 docker compose down -v           # stop and wipe
-docker compose exec app node demo.js         # re-stage the demo
-docker compose run --rm app node vapid.js    # generate push keys
+docker compose exec app node scripts/demo.js         # re-stage the demo
+docker compose run --rm app node scripts/vapid.js    # generate push keys
 ```
 
 ### Without Docker
@@ -71,7 +70,7 @@ Only one process can use the embedded database at a time. Starting a second serv
 PORT=4000
 # MONGO_URI=mongodb://127.0.0.1:27017/queueless   # unset → embedded db in server/data
 JWT_SECRET=change-me
-ADMIN_EMAIL=rs9538605@gmail.com   # registering with this email yields role=admin
+ADMIN_EMAIL=admin@example.com     # registering with this email yields role=admin
 
 # Web push (npm run vapid generates a pair). Blank → push reported as unavailable, app still works.
 VAPID_PUBLIC_KEY=
@@ -176,7 +175,7 @@ Guests may connect without a token. `queue:watch` / `queue:unwatch` (queueId) jo
 ```
 server/  src/app.js (express + socket)  db.js  index.js  auth.js  models.js  queue.js  push.js
          src/routes/ auth queues tokens appointments admin push
-         seed.js  demo.js  vapid.js  test/queue.test.js
+         scripts/ seed demo vapid    test/queue.test.js
 client/  src/App.jsx  api.js  auth.jsx  public/sw.js (push service worker)
          lib/  hooks geo motion gsap push notifications theme format maps osm
          ui/   index.jsx (primitives, Reveal, Logo)  Modal.jsx  Toast.jsx

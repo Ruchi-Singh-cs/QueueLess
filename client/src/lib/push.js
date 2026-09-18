@@ -29,10 +29,7 @@ const sameKey = (sub, bytes) => {
   return a.length === bytes.length && a.every((v, i) => v === bytes[i])
 }
 
-/**
- * Subscribe this device and hand the subscription to the server.
- * Throws a message worth showing the user when it can't.
- */
+/** Subscribe this device and register it with the server. Throws a user-facing message on failure. */
 export async function subscribePush() {
   const { enabled, publicKey } = await vapid()
   if (!enabled || !publicKey) throw new Error('Background notifications are not set up on this server yet.')
@@ -50,12 +47,7 @@ export async function subscribePush() {
   return sub
 }
 
-/**
- * Stop pushes to this device. Never registers a worker of its own — it only tears down one that's
- * already there, so logging out doesn't install a service worker for someone who never opted in.
- * The server scopes the delete to the caller, so logout passes the token it is about to discard
- * rather than letting us read it back after it's gone.
- */
+/** Unsubscribe this device. Never registers a worker; logout passes its token because the server scopes the delete to the caller. */
 export async function unsubscribePush(token = readAuth().token) {
   if (!pushSupported()) return
   const reg = await navigator.serviceWorker.getRegistration('/').catch(() => null)
@@ -79,11 +71,7 @@ export async function pushState() {
   return sub ? 'on' : 'off'
 }
 
-/**
- * Re-POST this device's existing subscription so the server binds it to whoever is logged in now,
- * and so a browser-rotated or re-keyed subscription heals itself. No-ops unless this device already
- * opted in — it never registers a worker or asks for permission on its own.
- */
+/** Re-post an existing subscription so it follows the current user and survives key rotation. No-op unless already opted in. */
 export async function resyncPush() {
   if (!pushSupported() || Notification.permission !== 'granted') return false
   const reg = await navigator.serviceWorker.getRegistration('/').catch(() => null)

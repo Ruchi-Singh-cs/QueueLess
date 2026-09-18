@@ -24,5 +24,10 @@
   },
   "allowScripts": {
     "esbuild@0.25.12": true
+  },
+  "version": "1.0.0",
+  "description": "QueueLess web client: Vite + React",
+  "engines": {
+    "node": ">=20"
   }
 }

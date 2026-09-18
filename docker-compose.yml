@@ -35,7 +35,7 @@ services:
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@example.com}
       # Blank by default: the app detects that and simply reports push as unavailable.
-      # Generate a pair with `docker compose run --rm app node vapid.js`, then put them in a .env
+      # Generate a pair with `docker compose run --rm app node scripts/vapid.js`, then put them in a .env
       # beside this file so subscriptions survive a restart.
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
@@ -43,11 +43,10 @@ services:
       # New businesses normally wait for an admin to verify them; the demo seeds its own
       # pending shop to show that flow, so leave this unset.
       AUTO_APPROVE_SHOPS: ${AUTO_APPROVE_SHOPS:-}
-    # demo.js is idempotent: it leaves the 22 seeded shops alone and rebuilds only the
-    # walkthrough clinic, so a restart always gives you a fresh stage.
+    # re-stages the demo on every start (idempotent).
     # exec hands the process to node so tini signals it directly. If staging ever fails the server
     # still comes up, rather than the container restarting forever with nothing served.
-    command: sh -c "node demo.js || echo 'demo staging failed - starting anyway'; exec node src/index.js"
+    command: sh -c "node scripts/demo.js || echo 'demo staging failed - starting anyway'; exec node src/index.js"
 
 volumes:
   mongo-data:

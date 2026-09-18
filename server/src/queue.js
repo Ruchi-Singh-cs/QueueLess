@@ -78,13 +78,7 @@ async function advance(queueId, mode, counter) {
   return { queue, done, next };
 }
 
-/**
- * Counters were reduced, so anyone still being served above the new limit is stranded: staff can't see
- * them (the board only draws counters 1..N), they can never be completed, and they keep holding an
- * active token. The grace sweeper makes it worse — it skips by their counter, which advance() clamps
- * back into range, so it takes out whoever is at the clamped counter instead, over and over.
- * Put them back at the front of the line to be called again, exactly like a recall.
- */
+/** Counters were reduced: return anyone served above the new limit to the front, like a recall. Otherwise they are invisible to staff and the sweeper skips the wrong person. */
 const release = async (queue) => {
   const stranded = await Token.find({ queue: queue._id, status: 'serving', counter: { $gt: queue.counters || 1 } }).select('_id');
   if (!stranded.length) return [];
